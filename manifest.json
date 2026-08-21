@@ -1,0 +1,15 @@
+{
+    "manifest_version": 3,
+    "name": "Job Autofiller",
+    "version": "0.1.0",
+    "description": "A Chrome extension that automatically fills out job application forms.",
+    "permissions": [
+        "storage"
+    ],
+    "content_scripts": [
+        {
+            "matches": ["*://*.myworkdayjobs.com/*"],
+            "js": ["content.js"]
+        }
+    ]
+}
