@@ -31,7 +31,7 @@ Approved answers are reused only when the question text matches exactly.
 
 ## Fill reports
 
-After each fill the extension keeps a report of which fields were handled and why, without any values. Press Copy fill report in the popup and share it to get a failing site fixed. It contains the host name, field labels, control types, Workday automation ids and reasons only.
+After each fill the extension keeps a report of every field and what happened to it: filled, filled with a lower confidence match, already filled, or skipped with a reason. The popup lists them, and Copy report or Download report gives you the same JSON. It contains the host name, field labels, control types, Workday automation ids, matched profile field names and reasons. It never contains profile values or anything typed into the page, and labels that contain your email, phone, address, name or links are redacted.
 
 ## Known limits
 

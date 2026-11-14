@@ -212,3 +212,18 @@ test('fill reports never contain profile values or typed answers', async () => {
   assert.ok(report.fields.some(item => item.reason === 'no_match'));
   assert.equal(report.counts.filled > 0, true);
 });
+
+test('reports list skipped fields with reasons and redact contact details found in labels', async () => {
+  const dom = makeDom(`${read('generic.html')}<label for="conf">Confirm jane.sample@example.com is correct</label><input id="conf">`);
+  const profile = sampleProfile();
+  dom.window.document.getElementById('first_name').value = 'Keep';
+  const run = await engine.fillPage(dom.window.document, profile, [], TIMING);
+  const report = reports.buildReport({ host: 'careers.example.com', ats: run.ats, results: run.results, profile });
+
+  assert.equal(report.counts.existing, 1);
+  assert.equal(report.fields.find(item => item.label === 'First Name *').reason, 'already_filled');
+  assert.ok(report.skipReasons.no_match >= 1);
+  assert.equal(report.skipReasons.manual_upload, 1);
+  assert.equal(JSON.stringify(report).includes('jane.sample'), false);
+  assert.ok(report.fields.some(item => item.label === 'Confirm [redacted] is correct'));
+});

@@ -44,6 +44,21 @@
     const { counts, fields } = response;
     say(`Filled ${counts.filled + counts.verify}, needs you ${counts.review}, already filled ${counts.existing}.`);
     const groups = [['Needs your attention', 'review'], ['Filled, please check', 'verify']];
+    const done = fields.filter(field => field.status === 'filled');
+    if (done.length) {
+      const details = document.createElement('details');
+      const summary = document.createElement('summary');
+      summary.textContent = `Filled (${done.length})`;
+      const list = document.createElement('ul');
+      list.className = 'list';
+      done.forEach(field => {
+        const item = document.createElement('li');
+        item.textContent = field.label || '(unlabelled field)';
+        list.appendChild(item);
+      });
+      details.append(summary, list);
+      results.appendChild(details);
+    }
     for (const [title, status] of groups) {
       const items = fields.filter(field => field.status === status);
       if (!items.length) continue;
@@ -123,14 +138,29 @@
     area.append(heading, list, save);
   }
 
-  async function copyReport() {
+  async function latestReport() {
     const [latest] = await store.getReports();
-    if (!latest) {
-      say('No fill report yet.');
-      return;
-    }
-    await navigator.clipboard.writeText(JSON.stringify(latest, null, 2));
+    if (!latest) say('No report yet. Press Fill this page first.');
+    return latest;
+  }
+
+  async function copyReport() {
+    const report = await latestReport();
+    if (!report) return;
+    await navigator.clipboard.writeText(JSON.stringify(report, null, 2));
     say('Report copied. It lists fields and reasons only, never your answers.');
+  }
+
+  async function downloadReport() {
+    const report = await latestReport();
+    if (!report) return;
+    const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `fill-report-${report.host || 'page'}-${report.generatedOn}.json`;
+    link.click();
+    URL.revokeObjectURL(link.href);
+    say('Report downloaded. It lists fields and reasons only, never your answers.');
   }
 
   async function showProfileStatus() {
@@ -143,6 +173,7 @@
   $('fill').addEventListener('click', fill);
   $('learn').addEventListener('click', learn);
   $('copy-report').addEventListener('click', copyReport);
+  $('download-report').addEventListener('click', downloadReport);
   $('settings').addEventListener('click', () => chrome.runtime.openOptionsPage());
   showProfileStatus();
 })();

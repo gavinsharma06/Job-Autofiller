@@ -10,6 +10,7 @@
     consent: 'Consent and agreement fields are left for you',
     sensitive: 'Sensitive field, left for you',
     rejected_by_page: 'The page cleared the value',
+    already_filled: 'Field already had a value',
     error: 'Unexpected error while filling'
   };
 
@@ -27,28 +28,50 @@
     return counts;
   }
 
+  // Contact details and links are the values most likely to leak through a
+  // label, so any label containing one is redacted. Single names are left
+  // alone because common words such as "Will" would hide real questions.
+  function secretsFrom(profile) {
+    if (!profile) return [];
+    const { personal = {}, address = {}, links = {} } = profile;
+    const values = [
+      personal.email, personal.phone, [personal.firstName, personal.lastName].filter(Boolean).join(' '),
+      address.line1, address.line2, address.postalCode, ...Object.values(links)
+    ];
+    return values.filter(value => typeof value === 'string' && value.length >= 5);
+  }
+
+  function scrub(text, secrets) {
+    return secrets.reduce((out, secret) => out.split(new RegExp(secret.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi')).join('[redacted]'), text);
+  }
+
   // Reports describe which fields were handled and why. They never contain
   // profile values or anything typed into the page.
-  function buildReport({ host, ats, results, extensionVersion }) {
+  function buildReport({ host, ats, results, extensionVersion, profile }) {
+    const secrets = secretsFrom(profile);
+    const reasons = {};
+    for (const result of results) {
+      if (result.status !== 'review') continue;
+      reasons[result.reason] = (reasons[result.reason] || 0) + 1;
+    }
     return {
       generatedOn: new Date().toISOString().slice(0, 10),
       extensionVersion: extensionVersion || '',
       host: clip(host, 100),
       ats: ats || 'generic',
       counts: summarize(results),
-      fields: results
-        .filter(result => result.status !== 'existing')
-        .map(result => ({
-          label: clip(result.label, 120),
-          kind: result.kind,
-          inputType: result.type || '',
-          automationId: clip(result.automationId, 80),
-          autocomplete: clip(result.autocomplete, 40),
-          status: result.status,
-          reason: result.reason || '',
-          matchedKey: result.key || '',
-          via: result.via || ''
-        }))
+      skipReasons: reasons,
+      fields: results.map(result => ({
+        label: scrub(clip(result.label, 120), secrets),
+        kind: result.kind,
+        inputType: result.type || '',
+        automationId: clip(result.automationId, 80),
+        autocomplete: clip(result.autocomplete, 40),
+        status: result.status,
+        reason: result.status === 'existing' ? 'already_filled' : result.reason || '',
+        matchedKey: result.key || '',
+        via: result.via || ''
+      }))
     };
   }
 

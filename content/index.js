@@ -25,6 +25,7 @@
       host: location.hostname,
       ats: lastRun.ats,
       results: lastRun.results,
+      profile,
       extensionVersion: chrome.runtime.getManifest().version
     });
     await store.addReport(report);
