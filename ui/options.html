@@ -14,20 +14,49 @@
     .card { border: 1px solid #8884; border-radius: 6px; padding: 8px 10px; margin: 8px 0; }
     table { width: 100%; border-collapse: collapse; }
     td { border-top: 1px solid #8884; padding: 5px; vertical-align: top; }
+    #qs-input { width: 100%; box-sizing: border-box; min-height: 180px; font-family: ui-monospace, monospace; font-size: 12px; padding: 6px; }
+    #quick-setup { border: 1px solid #8886; border-radius: 8px; padding: 4px 14px 12px; margin: 12px 0 20px; }
+    #qs-prompt { white-space: pre-wrap; font-size: 11px; max-height: 240px; overflow: auto; border: 1px solid #8884; padding: 6px; }
+    #qs-preview-area table { font-size: 12px; }
+    #qs-preview-area td.before { opacity: 0.7; }
+    #qs-preview-area .group td { font-weight: 600; border-top: 2px solid #8886; }
+    .warnings { font-size: 12px; margin: 6px 0; padding-left: 18px; }
   </style>
 </head>
 <body>
   <h1>Job Autofiller settings</h1>
   <p class="muted">Everything here is stored in this browser on this device. Nothing is sent anywhere.</p>
-  <div id="form"></div>
-  <div class="row">
-    <button id="save" class="primary" style="width:auto">Save profile</button>
-    <button id="export">Export profile</button>
-    <button id="import">Import profile</button>
-    <input id="import-file" type="file" accept="application/json" hidden>
-  </div>
-  <p id="status" class="muted" role="status"></p>
-  <p class="muted">Exported files contain personal details. Keep them out of Git and shared folders.</p>
+
+  <section id="quick-setup">
+    <h2>Quick setup</h2>
+    <p class="muted">Paste your profile as JSON, review what will change, then save. Every field is optional. You can build the JSON with any AI assistant using the prompt button, or write it yourself.</p>
+    <textarea id="qs-input" spellcheck="false" autocomplete="off" aria-label="Profile JSON" placeholder='{ "personal": { "firstName": "Jane", "email": "jane@example.com" } }'></textarea>
+    <div class="row">
+      <button id="qs-review" class="primary" style="width:auto">Review</button>
+      <button id="qs-copy">Copy AI setup prompt</button>
+      <button id="qs-reset">Clear box</button>
+    </div>
+    <p class="muted" id="qs-privacy"></p>
+    <details>
+      <summary>Show the prompt that gets copied</summary>
+      <pre id="qs-prompt"></pre>
+    </details>
+    <div id="qs-preview-area" hidden></div>
+    <p id="qs-status" class="muted" role="status"></p>
+  </section>
+
+  <details id="manual" open>
+    <summary><strong>Edit manually or import a file</strong></summary>
+    <div id="form"></div>
+    <div class="row">
+      <button id="save" class="primary" style="width:auto">Save profile</button>
+      <button id="export">Export profile</button>
+      <button id="import">Import profile</button>
+      <input id="import-file" type="file" accept="application/json" hidden>
+    </div>
+    <p id="status" class="muted" role="status"></p>
+    <p class="muted">Exported files contain personal details. Keep them out of Git and shared folders.</p>
+  </details>
 
   <h2>Saved answers</h2>
   <p class="muted">Answers you approved from the popup. They are only reused on an exact match of the question.</p>
@@ -40,7 +69,10 @@
   <script src="../core/profile.js"></script>
   <script src="../core/matcher.js"></script>
   <script src="../core/answers.js"></script>
+  <script src="../core/quicksetup.js"></script>
+  <script src="../core/setupPrompt.js"></script>
   <script src="../storage/store.js"></script>
   <script src="options.js"></script>
+  <script src="quicksetup.js"></script>
 </body>
 </html>

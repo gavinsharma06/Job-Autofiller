@@ -6,7 +6,25 @@ A Chrome extension that fills the repetitive parts of job applications (Workday 
 
 1. Open `chrome://extensions` and enable Developer mode.
 2. Choose Load unpacked and select this folder.
-3. Open the extension settings, enter your details and press Save profile. You can also import a JSON file shaped like `profile.example.json`.
+3. Open the extension settings and use Quick setup (below). You can also edit the form by hand or import a JSON file shaped like `profile.example.json`.
+
+## Quick setup
+
+Settings opens with a Quick setup box so you can finish onboarding in one paste and one review.
+
+1. Paste your profile as JSON. Every field is optional, so a partial profile is fine.
+2. Press Review. You see what is new, what differs from your saved profile, and any values that were ignored and why.
+3. Choose Merge with my current profile (default) or Replace my current profile, then press Save approved changes.
+
+Merging never overwrites a saved value unless you tick that value. New entries in education and employment are matched to existing ones by school, or by employer and title, and filled in or appended. Replace asks for a confirmation. Unsaved manual edits in the form block the save so nothing is lost.
+
+Pasted text is only ever parsed as JSON and checked against the profile schema in `core/profile.js`. Unknown fields, passwords, API keys, identity and card numbers, malformed emails, web addresses that are not http or https, and invalid months are dropped with a note. Values are shown as plain text and never run.
+
+### Copy AI setup prompt
+
+If your details are already in a resume or notes, Copy AI setup prompt puts a ready made prompt on your clipboard. It is generated from the live schema, so it lists every supported field and format, tells the AI to use only verified information, leave out unknown values and return valid JSON, and warns against sensitive data. The prompt contains none of your data, and the extension never sends anything to an AI. Using an AI assistant is optional and is governed by that provider's privacy practices. Check the result before pasting it back.
+
+Resume text extraction can later feed `validateCandidate` in `core/quicksetup.js` with a plain object, which reuses the same validation, preview and merge steps.
 
 ## Use
 
@@ -27,7 +45,8 @@ Approved answers are reused only when the question text matches exactly.
 * The profile, approved answers and fill reports live in `chrome.storage.local` on this device.
 * The extension requests `storage`, `activeTab` and `scripting`. It has no host permissions and runs only on the tab where you click Fill.
 * The code makes no network requests.
-* `private/`, `profile.json` and exported profile files are ignored by Git.
+* `private/`, `profile.json` and exported profile files are ignored by Git. You never need to create a personal JSON file inside the repository.
+* Quick setup does not log, send telemetry or make requests. Pasted data is cleared from the box after saving.
 
 ## Fill reports
 
@@ -48,7 +67,7 @@ npm test
 
 Layout:
 
-* `core/` pure logic: text normalising, profile schema, field matching, saved answers, reports
+* `core/` pure logic: text normalising, profile schema, quick setup validation and merge, AI setup prompt, field matching, saved answers, reports
 * `content/` page scanning, filling and the message handler injected on demand
 * `adapters/` ATS specific rules (Workday)
 * `storage/` thin wrapper over `chrome.storage.local`

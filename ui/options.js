@@ -5,6 +5,9 @@
   const $ = id => document.getElementById(id);
 
   let profile = api.profile.emptyProfile();
+  // Quick Setup reads this so it never replaces manual edits that are not saved yet.
+  const state = (api.optionsState = { dirty: false });
+  const markDirty = () => { state.dirty = true; };
 
   function say(text) {
     $('status').textContent = text;
@@ -57,6 +60,7 @@
         remove.addEventListener('click', () => {
           profile = collect();
           profile[list.id].splice(index, 1);
+          markDirty();
           render();
         });
         card.appendChild(remove);
@@ -67,6 +71,7 @@
       add.addEventListener('click', () => {
         profile = collect();
         profile[list.id].push(Object.fromEntries(list.fields.map(field => [field.key, field.type === 'checkbox' ? false : ''])));
+        markDirty();
         render();
       });
       box.appendChild(add);
@@ -118,6 +123,7 @@
   $('save').addEventListener('click', async () => {
     await store.saveProfile(collect());
     profile = await store.getProfile();
+    state.dirty = false;
     render();
     say('Saved on this device.');
   });
@@ -137,6 +143,7 @@
     if (!file) return;
     try {
       profile = api.profile.normalizeProfile(JSON.parse(await file.text()));
+      markDirty();
       render();
       say('Imported. Press Save profile to keep it.');
     } catch (error) {
@@ -149,9 +156,20 @@
     if (!confirm('Delete your profile, saved answers and fill reports from this browser?')) return;
     await store.clearAll();
     profile = api.profile.emptyProfile();
+    state.dirty = false;
     render();
     renderAnswers();
     say('All stored data deleted.');
+  });
+
+  $('form').addEventListener('input', markDirty);
+  $('form').addEventListener('change', markDirty);
+
+  // Quick Setup saves through the same store, then asks this page to reload it.
+  document.addEventListener('jobautofiller:profile-changed', async () => {
+    profile = await store.getProfile();
+    state.dirty = false;
+    render();
   });
 
   (async () => {
