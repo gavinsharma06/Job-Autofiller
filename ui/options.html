@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Job Autofiller settings</title>
+  <link rel="stylesheet" href="ui.css">
+  <style>
+    body { max-width: 720px; margin: 0 auto; padding: 20px; }
+    fieldset { margin: 12px 0; }
+    label.field { display: block; margin: 6px 0; }
+    label.field span { display: block; font-size: 12px; opacity: 0.8; }
+    label.field input[type="text"], label.field input[type="email"], label.field input[type="tel"],
+    label.field input[type="url"], label.field input[type="month"], label.field textarea { width: 100%; box-sizing: border-box; padding: 5px; }
+    .card { border: 1px solid #8884; border-radius: 6px; padding: 8px 10px; margin: 8px 0; }
+    table { width: 100%; border-collapse: collapse; }
+    td { border-top: 1px solid #8884; padding: 5px; vertical-align: top; }
+  </style>
+</head>
+<body>
+  <h1>Job Autofiller settings</h1>
+  <p class="muted">Everything here is stored in this browser on this device. Nothing is sent anywhere.</p>
+  <div id="form"></div>
+  <div class="row">
+    <button id="save" class="primary" style="width:auto">Save profile</button>
+    <button id="export">Export profile</button>
+    <button id="import">Import profile</button>
+    <input id="import-file" type="file" accept="application/json" hidden>
+  </div>
+  <p id="status" class="muted" role="status"></p>
+  <p class="muted">Exported files contain personal details. Keep them out of Git and shared folders.</p>
+
+  <h2>Saved answers</h2>
+  <p class="muted">Answers you approved from the popup. They are only reused on an exact match of the question.</p>
+  <table id="answers"></table>
+
+  <h2>Data</h2>
+  <button id="clear">Delete all stored data</button>
+
+  <script src="../core/text.js"></script>
+  <script src="../core/profile.js"></script>
+  <script src="../core/matcher.js"></script>
+  <script src="../core/answers.js"></script>
+  <script src="../storage/store.js"></script>
+  <script src="options.js"></script>
+</body>
+</html>

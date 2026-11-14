@@ -1,0 +1,46 @@
+{
+  "schemaVersion": 1,
+  "personal": {
+    "firstName": "Jane",
+    "middleName": "",
+    "lastName": "Sample",
+    "preferredName": "",
+    "email": "jane.sample@example.com",
+    "phoneCountryCode": "Canada (+1)",
+    "phone": "555 010 0199"
+  },
+  "address": {
+    "line1": "1 Example Street",
+    "line2": "",
+    "city": "Halifax",
+    "region": "Nova Scotia",
+    "postalCode": "A1A 1A1",
+    "country": "Canada"
+  },
+  "links": {
+    "linkedin": "https://www.linkedin.com/in/example",
+    "github": "https://github.com/example",
+    "website": "https://example.com"
+  },
+  "education": [
+    {
+      "school": "Example University",
+      "degree": "Bachelor's Degree",
+      "fieldOfStudy": "Computer Science",
+      "startDate": "2022-01",
+      "endDate": "2026-04",
+      "gpa": "3.5"
+    }
+  ],
+  "employment": [
+    {
+      "employer": "Example Cafe",
+      "title": "Server",
+      "location": "Halifax, NS",
+      "startDate": "2025-05",
+      "endDate": "2025-10",
+      "current": false,
+      "description": ""
+    }
+  ]
+}

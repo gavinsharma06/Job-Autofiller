@@ -1,3 +1,15 @@
 node_modules/
+coverage/
 .DS_Store
 Thumbs.db
+
+# Personal data must never be committed
+private/
+*.profile.json
+profile.json
+answers.json
+fill-report*.json
+.env
+.env.*
+*.pem
+*.zip

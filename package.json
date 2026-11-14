@@ -1,0 +1,12 @@
+{
+  "name": "job-autofiller",
+  "version": "0.2.0",
+  "private": true,
+  "description": "Chrome extension that fills repetitive job application forms from a locally stored profile.",
+  "scripts": {
+    "test": "node --test \"test/*.test.js\""
+  },
+  "devDependencies": {
+    "jsdom": "^25.0.1"
+  }
+}
