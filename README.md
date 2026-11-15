@@ -44,7 +44,7 @@ Approved answers are reused only when the question text matches exactly.
 
 * The profile, approved answers and fill reports live in `chrome.storage.local` on this device.
 * The extension requests `storage`, `activeTab` and `scripting`. It has no host permissions by default and runs only on the tab where you click Fill.
-* Optional page button: press Add page button on this site in the popup and approve Chrome's prompt for that one site (all Workday tenants for Workday). A small Fill button then appears on that site, also reachable with Alt+Shift+F. Only real clicks and key presses start a fill, and nothing is ever submitted.
+* Optional page button: press Add page button on this site in the popup and approve Chrome's prompt for that one site (access is requested for that hostname only). A small Fill button then appears on that site, also reachable with Alt+Shift+F. Only real clicks and key presses start a fill, and nothing is ever submitted.
 * The code makes no network requests.
 * `private/`, `profile.json` and exported profile files are ignored by Git. You never need to create a personal JSON file inside the repository.
 * Quick setup does not log, send telemetry or make requests. Pasted data is cleared from the box after saving.

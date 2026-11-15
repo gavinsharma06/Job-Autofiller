@@ -10,7 +10,6 @@
   ];
 
   const LAUNCHER_FILES = CONTENT_FILES.concat(['content/launcher.js']);
-  const WORKDAY_HOST = /(^|\.)myworkdayjobs\.com$/i;
 
   function say(text, isError) {
     const el = $('message');
@@ -166,36 +165,19 @@
     say('Report downloaded. It lists fields and reasons only, never your answers.');
   }
 
-  // One click per site: ask Chrome for access to just this site, then register
-  // the page button there. Nothing is read or changed anywhere else.
+  // The tab is looked up ahead of time so the permission request is the first
+  // thing the click does and Chrome still counts it as a user gesture.
+  let activeTab = null;
+  chrome.tabs.query({ active: true, currentWindow: true }).then(([tab]) => { activeTab = tab; });
+
   async function enableSite() {
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    let url;
     try {
-      url = new URL(tab.url);
+      const tab = activeTab || (await chrome.tabs.query({ active: true, currentWindow: true }))[0];
+      const result = await api.site.enableOnTab(chrome, tab, LAUNCHER_FILES);
+      say(result.message, !result.ok);
     } catch (error) {
-      say('This page cannot have a button.', true);
-      return;
+      say(`Could not add the page button: ${String(error && error.message || error)}`, true);
     }
-    if (url.protocol !== 'https:') {
-      say('The page button works on secure (https) sites only.', true);
-      return;
-    }
-    const pattern = WORKDAY_HOST.test(url.hostname) ? '*://*.myworkdayjobs.com/*' : `${url.origin}/*`;
-    const granted = await chrome.permissions.request({ origins: [pattern] });
-    if (!granted) {
-      say('Access was not granted, so no button was added.', true);
-      return;
-    }
-    const id = `jaf-${pattern.replace(/[^a-z0-9]+/gi, '-')}`;
-    const existing = await chrome.scripting.getRegisteredContentScripts({ ids: [id] });
-    if (!existing.length) {
-      await chrome.scripting.registerContentScripts([{
-        id, matches: [pattern], js: LAUNCHER_FILES, runAt: 'document_idle', persistAcrossSessions: true
-      }]);
-    }
-    await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: LAUNCHER_FILES });
-    say(`Button added on ${pattern.replace('*://', '').replace('/*', '')}. Press Alt+Shift+F or use the button on the page.`);
   }
 
   async function showProfileStatus() {

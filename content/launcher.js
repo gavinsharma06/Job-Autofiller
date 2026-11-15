@@ -8,7 +8,7 @@
 
   const host = doc.createElement('div');
   host.setAttribute('data-job-autofiller', 'launcher');
-  const shadow = host.attachShadow({ mode: 'closed' });
+  const shadow = host.attachShadow({ mode: 'open' });
   const style = doc.createElement('style');
   style.textContent = [
     ':host { all: initial; }',
@@ -22,6 +22,7 @@
   const button = doc.createElement('button');
   button.type = 'button';
   button.textContent = 'Job Autofiller: fill this page (Alt+Shift+F)';
+  button.setAttribute('aria-label', 'Job Autofiller: fill this page');
   const status = doc.createElement('p');
   status.setAttribute('role', 'status');
   box.append(button, status);
