@@ -56,6 +56,8 @@
     }
   }
 
+  api.run = { fill };
+
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     handle(message).then(sendResponse, error => sendResponse({ error: String(error && error.message || error) }));
     return true;

@@ -11,6 +11,7 @@ test('manifest is MV3 with minimal permissions and existing entry points', () =>
   assert.equal(manifest.manifest_version, 3);
   assert.deepEqual(manifest.permissions.sort(), ['activeTab', 'scripting', 'storage']);
   assert.equal(manifest.host_permissions, undefined);
+  assert.deepEqual(manifest.optional_host_permissions, ['https://*/*']);
   assert.equal(manifest.content_scripts, undefined);
   assert.ok(exists(manifest.action.default_popup));
   assert.ok(exists(manifest.options_page));
@@ -21,7 +22,7 @@ test('every file injected by the popup exists', () => {
   const block = /CONTENT_FILES = \[([\s\S]*?)\];/.exec(source)[1];
   const files = block.match(/'[^']+'/g).map(item => item.slice(1, -1));
   assert.ok(files.length > 5);
-  files.forEach(file => assert.ok(exists(file), file));
+  files.concat(['content/launcher.js']).forEach(file => assert.ok(exists(file), file));
 });
 
 test('scripts referenced by the extension pages exist', () => {

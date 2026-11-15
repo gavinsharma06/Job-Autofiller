@@ -5,6 +5,7 @@
   "description": "Fills repeated job application fields from a profile stored on your device. Never submits anything.",
   "minimum_chrome_version": "110",
   "permissions": ["storage", "activeTab", "scripting"],
+  "optional_host_permissions": ["https://*/*"],
   "action": {
     "default_title": "Job Autofiller",
     "default_popup": "ui/popup.html"

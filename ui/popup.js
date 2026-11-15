@@ -9,6 +9,9 @@
     'content/scan.js', 'content/fill.js', 'content/engine.js', 'content/index.js'
   ];
 
+  const LAUNCHER_FILES = CONTENT_FILES.concat(['content/launcher.js']);
+  const WORKDAY_HOST = /(^|\.)myworkdayjobs\.com$/i;
+
   function say(text, isError) {
     const el = $('message');
     el.textContent = text;
@@ -163,14 +166,56 @@
     say('Report downloaded. It lists fields and reasons only, never your answers.');
   }
 
+  // One click per site: ask Chrome for access to just this site, then register
+  // the page button there. Nothing is read or changed anywhere else.
+  async function enableSite() {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    let url;
+    try {
+      url = new URL(tab.url);
+    } catch (error) {
+      say('This page cannot have a button.', true);
+      return;
+    }
+    if (url.protocol !== 'https:') {
+      say('The page button works on secure (https) sites only.', true);
+      return;
+    }
+    const pattern = WORKDAY_HOST.test(url.hostname) ? '*://*.myworkdayjobs.com/*' : `${url.origin}/*`;
+    const granted = await chrome.permissions.request({ origins: [pattern] });
+    if (!granted) {
+      say('Access was not granted, so no button was added.', true);
+      return;
+    }
+    const id = `jaf-${pattern.replace(/[^a-z0-9]+/gi, '-')}`;
+    const existing = await chrome.scripting.getRegisteredContentScripts({ ids: [id] });
+    if (!existing.length) {
+      await chrome.scripting.registerContentScripts([{
+        id, matches: [pattern], js: LAUNCHER_FILES, runAt: 'document_idle', persistAcrossSessions: true
+      }]);
+    }
+    await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: LAUNCHER_FILES });
+    say(`Button added on ${pattern.replace('*://', '').replace('/*', '')}. Press Alt+Shift+F or use the button on the page.`);
+  }
+
   async function showProfileStatus() {
     const profile = await store.getProfile();
-    $('profile-status').textContent = api.profile.hasProfileData(profile)
-      ? `Profile: ${api.profile.getValue(profile, 'fullName') || profile.personal.email}`
-      : 'No profile yet. Open Settings to add your details.';
+    const described = api.profile.describeProfile(profile);
+    const el = $('profile-status');
+    if (described.state === 'missing') {
+      el.textContent = 'No profile yet. Open Settings and run Quick Setup.';
+      el.className = 'error';
+      return;
+    }
+    el.textContent = `Profile: ${api.profile.getValue(profile, 'fullName') || profile.personal.email}`;
+    if (described.state === 'incomplete') {
+      el.textContent += `. Missing: ${described.missing.join(', ')}.`;
+      el.className = 'error';
+    }
   }
 
   $('fill').addEventListener('click', fill);
+  $('enable-site').addEventListener('click', enableSite);
   $('learn').addEventListener('click', learn);
   $('copy-report').addEventListener('click', copyReport);
   $('download-report').addEventListener('click', downloadReport);

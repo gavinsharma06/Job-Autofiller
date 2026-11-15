@@ -112,6 +112,26 @@
     return Boolean(p && (p.firstName || p.lastName || p.email));
   }
 
+  const ESSENTIAL = [
+    ['personal.firstName', 'First name'],
+    ['personal.lastName', 'Last name'],
+    ['personal.email', 'Email'],
+    ['personal.phone', 'Phone'],
+    ['address.line1', 'Address line 1'],
+    ['address.city', 'City'],
+    ['address.region', 'Province or state'],
+    ['address.postalCode', 'Postal code'],
+    ['address.country', 'Country']
+  ];
+
+  // Says whether the saved profile can drive a form: missing, incomplete (with
+  // the names of the essential fields that are empty) or ready.
+  function describeProfile(profile) {
+    if (!hasProfileData(profile)) return { state: 'missing', missing: [] };
+    const missing = ESSENTIAL.filter(([path]) => !getValue(profile, path)).map(([, label]) => label);
+    return { state: missing.length ? 'incomplete' : 'ready', missing };
+  }
+
   // Paths look like personal.email, employment.0.title or employment.0.startDate.month.
   function getValue(profile, path) {
     if (!profile) return '';
@@ -134,7 +154,7 @@
     return typeof node === 'string' ? node : '';
   }
 
-  const api = { SCHEMA_VERSION, SECTIONS, LISTS, normalizeProfile, emptyProfile, hasProfileData, getValue };
+  const api = { SCHEMA_VERSION, SECTIONS, LISTS, normalizeProfile, emptyProfile, hasProfileData, describeProfile, getValue };
   if (typeof module === 'object' && module.exports) module.exports = api;
   else (root.JobAutofiller = root.JobAutofiller || {}).profile = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);
