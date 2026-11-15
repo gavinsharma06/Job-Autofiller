@@ -169,6 +169,21 @@ test('workday: my information, custom dropdowns and repeated sections', async ()
   assert.equal(doc.querySelector('[role="listbox"]'), null);
 });
 
+test('workday: a selected value pill listbox is not mistaken for the opened dropdown', async () => {
+  const html = `
+    <label for="fn">First Name*</label><input id="fn" data-automation-id="legalNameSection_firstName">
+    <ul role="listbox" aria-label="items selected"><div role="option" aria-label="Canada (+1), press delete to clear value.">Canada (+1)</div></ul>
+    <label for="prov">Province or Territory*</label>
+    <button id="prov" type="button" aria-haspopup="listbox"
+      data-options='["Select One","Alberta","Nova Scotia","Ontario"]'>Select One</button>`;
+  const dom = makeDom(html, 'https://acme.wd3.myworkdayjobs.com/en-US/careers/apply');
+  const doc = dom.window.document;
+  wireListboxes(doc);
+  const run = await engine.fillPage(doc, sampleProfile(), [], TIMING);
+  assert.equal(doc.getElementById('prov').textContent, 'Nova Scotia');
+  assert.equal(statusOf(run, 'Province or Territory*').status, 'filled');
+});
+
 test('workday: dropdown without a matching option is flagged and closed', async () => {
   const dom = makeDom(read('workday.html'), 'https://acme.wd3.myworkdayjobs.com/en-US/careers/apply');
   const doc = dom.window.document;

@@ -17,7 +17,7 @@
     ['address.line1', /^(street |mailing |home |current )?address( line)?( 1| one)?$|^street( address)?$/, HIGH],
     ['address.line2', /^address( line)? (2|two)$|^(apt|apartment|suite|unit)( |$)/, HIGH],
     ['address.city', /^(city|town|municipality)( of residence)?$|^city (town|municipality)$/, HIGH],
-    ['address.region', /^(state|province|region|territory)( (state|province|region|territory))*$|^(state|province) or (state|province)$/, HIGH],
+    ['address.region', /^(state|province|region|territory)( (or )?(state|province|region|territory))*$/, HIGH],
     ['address.postalCode', /^(zip|postal|post) ?code$|^(zip|postal)$|^(zip postal|postal zip)( code)?$/, HIGH],
     ['address.country', /^(your )?country( region| of residence)?$|^country of residence$/, HIGH],
     ['links.linkedin', /linkedin/, MEDIUM],

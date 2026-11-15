@@ -24,6 +24,8 @@ const CASES = [
   ['City', 'address.city'],
   ['Province/State', 'address.region'],
   ['State or Province', 'address.region'],
+  ['Province or Territory', 'address.region'],
+  ['Province or Territory *', 'address.region'],
   ['Postal Code', 'address.postalCode'],
   ['ZIP / Postal Code', 'address.postalCode'],
   ['Country/Region', 'address.country'],

@@ -64,16 +64,31 @@
     button.dispatchEvent(new view.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
   }
 
+  // Workday also renders the current selection of other fields (for example
+  // "Canada (+1)") as a listbox holding one pill option. Those must never be
+  // mistaken for the list that the clicked button opened.
+  function findOptions(button) {
+    const doc = button.ownerDocument;
+    const controlled = button.getAttribute('aria-controls');
+    if (controlled) {
+      const list = doc.getElementById(controlled);
+      const found = list ? Array.from(list.querySelectorAll('[role="option"]')) : [];
+      if (found.length) return found;
+    }
+    const candidates = Array.from(doc.querySelectorAll('[role="listbox"]'))
+      .map(list => Array.from(list.querySelectorAll('[role="option"]'))
+        .filter(option => !/press delete to clear/i.test(option.getAttribute('aria-label') || '')))
+      .filter(found => found.length);
+    candidates.sort((a, b) => b.length - a.length);
+    return candidates[0] || null;
+  }
+
   async function fillListbox(field, value, timing) {
     const { timeout, interval } = timing;
     const button = field.el;
     const doc = button.ownerDocument;
     button.click();
-    const options = await waitFor(() => {
-      const lists = Array.from(doc.querySelectorAll('[role="listbox"]'));
-      const list = lists.find(candidate => candidate.querySelector('[role="option"]'));
-      return list ? Array.from(list.querySelectorAll('[role="option"]')) : null;
-    }, timeout, interval);
+    const options = await waitFor(() => findOptions(button), timeout, interval);
     if (!options) {
       closeList(button);
       return { ok: false, reason: 'unsupported_control' };
