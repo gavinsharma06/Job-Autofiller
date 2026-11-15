@@ -50,6 +50,7 @@
     }
     const { counts, fields } = response;
     let text = `Filled ${counts.filled + counts.verify}, needs you ${counts.review}, already filled ${counts.existing}.`;
+    if (counts.optional) text += ` Optional, left blank ${counts.optional}.`;
     if (described.state === 'incomplete') text += ` Profile is missing: ${described.missing.join(', ')}.`;
     show(text, { counts, missingProfile: described.missing, fields: fields.map(({ label, status: outcome, reason }) => ({ label, status: outcome, reason })) });
   }
@@ -59,7 +60,7 @@
     // api.trust exists only so tests can stand in for a real user event. Page
     // scripts cannot reach it because content scripts run in an isolated world.
     if (!(api.trust ? api.trust(event) : event.isTrusted)) return;
-    run().catch(error => show(`Could not fill this page: ${error && error.message || error}`));
+    run().catch(error => show(`Could not fill this page: ${api.text.describeError(error)}`));
   }
 
   button.addEventListener('click', guarded);
@@ -73,5 +74,5 @@
     const described = initial(profile);
     if (described.state === 'missing') show('No profile saved. Open the extension settings and run Quick Setup first.', { error: 'no_profile' });
     else if (described.state === 'incomplete') show(`Profile is missing: ${described.missing.join(', ')}.`, { missingProfile: described.missing });
-  });
+  }).catch(error => show(api.text.describeError(error)));
 })(globalThis);

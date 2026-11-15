@@ -48,3 +48,26 @@ test('clearAll removes everything', async () => {
   await store.clearAll();
   assert.deepEqual(chromeApi.data, {});
 });
+
+test('private data and the role type round trip and are sanitized', async () => {
+  const chromeApi = fakeChrome();
+  const store = createStore(chromeApi);
+  assert.deepEqual((await store.getPrivate()).certifications, []);
+  await store.savePrivate({
+    entries: { a: { employer: 'Alpha', title: 'Dev', startDate: '2026-01', description: 'x', extra: 'dropped' } },
+    rolePicks: { backend: ['a'] },
+    websites: ['https://example.com/me', 'not a url'],
+    password: 'x'
+  });
+  const loaded = await store.getPrivate();
+  assert.equal(loaded.entries.a.employer, 'Alpha');
+  assert.equal('extra' in loaded.entries.a, false);
+  assert.deepEqual(loaded.websites, ['https://example.com/me']);
+  assert.equal('password' in chromeApi.data.privateData, false);
+  await store.saveRole('support');
+  assert.equal(await store.getRole(), 'support');
+  await store.saveRole('nonsense');
+  assert.equal(await store.getRole(), '');
+  await store.clearPrivate();
+  assert.deepEqual(Object.keys((await store.getPrivate()).entries), []);
+});

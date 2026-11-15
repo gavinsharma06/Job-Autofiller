@@ -5,8 +5,9 @@
 
   const CONTENT_FILES = [
     'core/text.js', 'core/profile.js', 'core/matcher.js', 'core/answers.js', 'core/reports.js',
+    'core/format.js', 'core/degree.js', 'core/privatedata.js',
     'storage/store.js', 'adapters/workday.js',
-    'content/scan.js', 'content/fill.js', 'content/engine.js', 'content/index.js'
+    'content/scan.js', 'content/multiselect.js', 'content/fill.js', 'content/repeaters.js', 'content/engine.js', 'content/index.js'
   ];
 
   const LAUNCHER_FILES = CONTENT_FILES.concat(['content/launcher.js']);
@@ -44,7 +45,9 @@
     const results = $('results');
     results.replaceChildren();
     const { counts, fields } = response;
-    say(`Filled ${counts.filled + counts.verify}, needs you ${counts.review}, already filled ${counts.existing}.`);
+    let summary = `Filled ${counts.filled + counts.verify}, needs you ${counts.review}, already filled ${counts.existing}.`;
+    if (counts.optional) summary += ` Optional, left blank ${counts.optional}.`;
+    say(summary);
     const groups = [['Needs your attention', 'review'], ['Filled, please check', 'verify']];
     const done = fields.filter(field => field.status === 'filled');
     if (done.length) {
@@ -83,7 +86,13 @@
       say('This page cannot be filled. Browser pages and the Web Store are blocked.', true);
       return;
     }
-    const response = await request({ type: 'fill' });
+    let response;
+    try {
+      response = await request({ type: 'fill' });
+    } catch (error) {
+      say(api.text.describeError(error), true);
+      return;
+    }
     if (response.error === 'no_profile') {
       say('Add your details in Settings first.', true);
       return;
@@ -196,6 +205,11 @@
     }
   }
 
+  async function showRole() {
+    $('role').value = await store.getRole();
+  }
+
+  $('role').addEventListener('change', () => store.saveRole($('role').value));
   $('fill').addEventListener('click', fill);
   $('enable-site').addEventListener('click', enableSite);
   $('learn').addEventListener('click', learn);
@@ -203,4 +217,5 @@
   $('download-report').addEventListener('click', downloadReport);
   $('settings').addEventListener('click', () => chrome.runtime.openOptionsPage());
   showProfileStatus();
+  showRole();
 })();

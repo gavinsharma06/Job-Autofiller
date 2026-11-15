@@ -6,6 +6,10 @@
   const scan = load('scan', './scan');
   const filler = load('fill', './fill');
   const workday = load('workday', '../adapters/workday');
+  const format = load('format', '../core/format');
+  const degree = load('degree', '../core/degree');
+  const privApi = load('privatedata', '../core/privatedata');
+  const repeaters = load('repeaters', './repeaters');
 
   const DEFAULT_TIMING = { timeout: 2000, interval: 50 };
   const LEARNABLE_KINDS = new Set(['text', 'textarea', 'select', 'radio', 'listbox']);
@@ -50,7 +54,25 @@
     return Object.assign({ status: 'review', reason }, extra);
   }
 
-  async function processField(field, profile, answers, adapter, timing) {
+  // Reasons that mean "nothing was tried because there was nothing to enter".
+  // On an optional field these do not need the person's attention.
+  // File uploads always stay visible. An unmatched question counts too on Workday, where required fields always
+  // carry a star. Elsewhere it stays visible because the person may answer it.
+  const NOT_ATTEMPTED = new Set(['no_profile_value', 'ambiguous', 'manual_checkbox', 'sensitive', 'approval_required']);
+
+  function isoParts(iso) {
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
+    return match ? { year: match[1], month: match[2], day: match[3] } : null;
+  }
+
+  function contextFor(key, ctx) {
+    const base = { enterToSearch: Boolean(ctx.adapter) };
+    if (key && /\.degree$/.test(key)) base.pick = degree.pickDegree;
+    return base;
+  }
+
+  async function decide(field, ctx) {
+    const { profile, answers, library, host, adapter, timing } = ctx;
     if (field.kind === 'file') return review('manual_upload');
     if (field.hasValue) return { status: 'existing' };
     if (matcher.isSensitive(field.label)) return review('sensitive');
@@ -68,8 +90,6 @@
       return review(matcher.isConsent(field.label) ? 'consent' : 'manual_checkbox');
     }
 
-    if (field.kind === 'combobox') return review('unsupported_control');
-
     const match = resolveKey(field, adapter);
     if (match && match.ambiguous) return review('ambiguous');
 
@@ -79,36 +99,91 @@
       value = profileApi.getValue(profile, match.key);
       meta = { key: match.key, via: match.via };
       if (value === '') return review('no_profile_value', meta);
+      value = format.formatValue(match.key, value);
     } else {
+      const rule = privApi.findRule(library, field.dateLabel || field.label, host);
       value = answersApi.findAnswer(answers, field.label);
-      if (value == null) return review('no_match');
       meta = { via: 'saved answer' };
+      if (value == null && rule) {
+        if (rule.ask) return review('approval_required', { via: 'answer library' });
+        const resolved = rule.answer.map(item => privApi.resolveAnswer(item));
+        value = field.datePart ? (isoParts(resolved[0]) || {})[field.datePart] : resolved;
+        meta = { via: 'answer library' };
+      }
+      if (value == null || value === '') return review('no_match');
     }
 
-    const outcome = await filler.fillField(field, value, timing);
+    const key = match ? match.key : '';
+    const outcome = await filler.fillField(field, value, timing, contextFor(key, ctx));
     if (!outcome.ok) return review(outcome.reason, meta);
     const unsure = match && match.confidence !== matcher.HIGH;
     return Object.assign({ status: unsure ? 'verify' : 'filled' }, meta);
   }
 
+  async function processField(field, ctx) {
+    const outcome = await decide(field, ctx);
+    const skipped = NOT_ATTEMPTED.has(outcome.reason) || (ctx.adapter && outcome.reason === 'no_match');
+    if (outcome.status === 'review' && ctx.judgeOptional && field.required === false && skipped) {
+      return Object.assign({}, outcome, { status: 'optional' });
+    }
+    return outcome;
+  }
+
+  // The profile the form is filled from: the saved profile plus the work
+  // history, certifications and websites that come from private data.
+  function buildProfile(profile, priv, role) {
+    const effective = Object.assign({}, profile);
+    if (!profile.employment.length && priv) effective.employment = privApi.workEntries(priv, role);
+    effective.certifications = priv ? priv.certifications : [];
+    effective.websites = privApi.websiteList(priv, profile).map(url => ({ url }));
+    return effective;
+  }
+
+  function pageText(doc) {
+    const header = doc.querySelector('[data-automation-id="jobPostingHeader"], h1');
+    return `${doc.title || ''} ${header ? header.textContent : ''}`;
+  }
+
   async function fillPage(doc, profile, answers, options) {
-    const timing = Object.assign({}, DEFAULT_TIMING, options && options.timing);
+    const opts = options || {};
+    const timing = Object.assign({}, DEFAULT_TIMING, opts.timing);
     ensureStyle(doc);
     clearMarks(doc);
-    const adapter = workday.matchesHost(doc.location && doc.location.hostname) ? workday : null;
+    const host = doc.location && doc.location.hostname;
+    const adapter = workday.matchesHost(host) ? workday : null;
+    const priv = opts.privateData ? privApi.sanitizePrivate(opts.privateData) : null;
+    const role = opts.role || privApi.detectRole(pageText(doc)) || 'backend';
+    const effective = buildProfile(profile, priv, role);
+
+    if (adapter) {
+      await repeaters.ensureSections(doc, 'employment', effective.employment.length, timing);
+      await repeaters.ensureSections(doc, 'certifications', effective.certifications.length, timing);
+      await repeaters.ensureSections(doc, 'websites', effective.websites.length, timing);
+    }
+
+    const fields = scan.collectFields(doc);
+    const ctx = {
+      profile: effective,
+      answers: answers || [],
+      library: priv ? priv.library : [],
+      host,
+      adapter,
+      timing,
+      judgeOptional: Boolean(adapter) || fields.some(field => field.required)
+    };
     const results = [];
-    for (const field of scan.collectFields(doc)) {
+    for (const field of fields) {
       let outcome;
       try {
-        outcome = await processField(field, profile, answers || [], adapter, timing);
+        outcome = await processField(field, ctx);
       } catch (error) {
         outcome = review('error');
       }
-      if (outcome.status !== 'existing') field.el.setAttribute('data-jaf', outcome.status);
+      if (outcome.status !== 'existing' && outcome.status !== 'optional') field.el.setAttribute('data-jaf', outcome.status);
       results.push(Object.assign({ field, index: field.index, label: field.label, kind: field.kind, type: field.type,
         automationId: field.automationId, autocomplete: field.autocomplete }, outcome));
     }
-    return { ats: adapter ? 'workday' : 'generic', results };
+    return { ats: adapter ? 'workday' : 'generic', role, results };
   }
 
   // Fields the tool could not match that now hold something the user typed.

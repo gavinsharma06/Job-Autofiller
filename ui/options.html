@@ -58,6 +58,17 @@
     <p class="muted">Exported files contain personal details. Keep them out of Git and shared folders.</p>
   </details>
 
+  <section id="private-data">
+    <h2>Private data</h2>
+    <p class="muted">Import your work history chunks (projects file), certifications and standing answers (answer library file). They are stored in this browser only and are used for Work Experience, Certification and Websites sections and employer questions. Keep the source files out of Git.</p>
+    <div class="row">
+      <button id="pd-import">Import files</button>
+      <input id="pd-file" type="file" accept="application/json" multiple hidden>
+      <button id="pd-clear">Clear private data</button>
+    </div>
+    <p id="pd-status" class="muted" role="status"></p>
+  </section>
+
   <h2>Saved answers</h2>
   <p class="muted">Answers you approved from the popup. They are only reused on an exact match of the question.</p>
   <table id="answers"></table>
@@ -69,10 +80,12 @@
   <script src="../core/profile.js"></script>
   <script src="../core/matcher.js"></script>
   <script src="../core/answers.js"></script>
+  <script src="../core/privatedata.js"></script>
   <script src="../core/quicksetup.js"></script>
   <script src="../core/setupPrompt.js"></script>
   <script src="../storage/store.js"></script>
   <script src="options.js"></script>
   <script src="quicksetup.js"></script>
+  <script src="privatedata.js"></script>
 </body>
 </html>

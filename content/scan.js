@@ -76,6 +76,73 @@
     return !text || /^(select|choose|please select)\b/i.test(text.trim());
   }
 
+  const MULTISELECT = '[data-automation-id="multiSelectContainer"], [data-uxi-widget-type="multiselect"]';
+  const PILL = '[data-automation-id="selectedItem"], [data-automation-id="selectedItemList"] li, [data-automation-id="DELETE_charm"], [aria-label*="press delete to clear" i]';
+
+  function isMultiselect(el) {
+    return el.getAttribute('data-automation-id') === 'searchBox' || Boolean(el.closest(MULTISELECT));
+  }
+
+  // The box that holds the search input together with its selected pills.
+  function containerOf(el) {
+    return el.closest(MULTISELECT) || el.closest('[data-automation-id^="formField"]') || el.parentElement;
+  }
+
+  // Selected values show as pills. Several selectors can hit the same pill, so
+  // each one is reduced to its outermost pill element.
+  function pillsOf(container) {
+    const found = [];
+    container.querySelectorAll(PILL).forEach(node => {
+      const pill = node.matches('[data-automation-id="DELETE_charm"]') ? node.parentElement : node;
+      if (pill && !found.some(item => item === pill || item.contains(pill) || pill.contains(item))) found.push(pill);
+    });
+    return found;
+  }
+
+  function pillText(pill) {
+    return (pill.getAttribute('data-automation-label') || pill.textContent || '').replace(/\s+/g, ' ').trim();
+  }
+
+  const DATE_PART_ID = /dateSection(Month|Day|Year)-input/i;
+  const PART_WORDS = /^(month|day|year|mm|dd|yyyy)$/;
+
+  function datePartOf(el) {
+    const byId = DATE_PART_ID.exec(el.getAttribute('data-automation-id') || '');
+    if (byId) return byId[1].toLowerCase();
+    if (el.getAttribute('role') !== 'spinbutton') return '';
+    const hint = `${el.getAttribute('aria-label') || ''} ${el.getAttribute('placeholder') || ''}`.toLowerCase();
+    if (/\bmonth\b|\bmm\b/.test(hint)) return 'month';
+    if (/\bday\b|\bdd\b/.test(hint)) return 'day';
+    if (/\byear\b|\byyyy\b/.test(hint)) return 'year';
+    return '';
+  }
+
+  // Month, Day and Year boxes are labelled only by their own part name, so the
+  // question they belong to ("From", "Issued Date") is read from the parent.
+  function dateGroupLabel(el, part) {
+    const doc = el.ownerDocument;
+    for (let node = el.parentElement, depth = 0; node && depth < 6; node = node.parentElement, depth++) {
+      const siblings = Array.from(node.querySelectorAll('input')).filter(input => datePartOf(input) === part);
+      if (siblings.length > 1) return '';
+      const ids = (node.getAttribute('aria-labelledby') || '').split(/\s+/).filter(Boolean);
+      let found = ids.map(id => doc.getElementById(id)).filter(Boolean).map(textOf).join(' ').trim();
+      if (!found && node.matches('[role="group"], fieldset')) found = (node.getAttribute('aria-label') || '').trim();
+      if (!found) {
+        const label = Array.from(node.querySelectorAll('label, legend')).find(item => {
+          const own = textOf(item).toLowerCase().replace(/[^a-z]/g, '');
+          return own && !PART_WORDS.test(own);
+        });
+        if (label) found = textOf(label);
+      }
+      if (found && !PART_WORDS.test(found.toLowerCase().replace(/[^a-z]/g, ''))) return found;
+    }
+    return '';
+  }
+
+  function isRequired(el, rawLabel) {
+    return el.required === true || el.getAttribute('aria-required') === 'true' || /\*|\(required\)/i.test(rawLabel || '');
+  }
+
   function hasValue(field) {
     const el = field.el;
     switch (field.kind) {
@@ -83,6 +150,7 @@
       case 'radio': return field.radios.some(radio => radio.el.checked);
       case 'checkbox': return el.checked;
       case 'listbox': return !isPlaceholderText(el.textContent);
+      case 'multiselect': return pillsOf(containerOf(el)).length > 0;
       default: return String(el.value || '').trim() !== '';
     }
   }
@@ -97,6 +165,7 @@
       }
       case 'listbox': return isPlaceholderText(el.textContent) ? '' : el.textContent.trim();
       case 'checkbox': return el.checked ? 'checked' : '';
+      case 'multiselect': return pillsOf(containerOf(el)).map(pillText).join(', ');
       default: return String(el.value || '').trim();
     }
   }
@@ -124,6 +193,14 @@
         name: el.getAttribute('name') || ''
       };
 
+      const part = tag === 'input' ? datePartOf(el) : '';
+      if (part) {
+        field.datePart = part;
+        field.dateLabel = dateGroupLabel(el, part);
+        if (field.dateLabel) field.label = field.dateLabel;
+      }
+      field.required = isRequired(el, part ? field.dateLabel : label.text);
+
       if (tag === 'select') {
         field.kind = 'select';
         field.options = selectOptions(el);
@@ -141,11 +218,14 @@
           fields.push(group);
         }
         group.radios.push({ el, text });
+        group.required = group.required || isRequired(el, group.label);
         return;
       } else if (type === 'checkbox') {
         field.kind = 'checkbox';
       } else if (type === 'file') {
         field.kind = 'file';
+      } else if (isMultiselect(el)) {
+        field.kind = 'multiselect';
       } else if (el.getAttribute('role') === 'combobox' || el.hasAttribute('aria-autocomplete')) {
         field.kind = 'combobox';
       } else {
@@ -161,7 +241,7 @@
     return fields;
   }
 
-  const api = { collectFields, hasValue, readValue, isPlaceholderText, isHidden };
+  const api = { collectFields, hasValue, readValue, isPlaceholderText, isHidden, containerOf, pillsOf, pillText };
   if (typeof module === 'object' && module.exports) module.exports = api;
   else (root.JobAutofiller = root.JobAutofiller || {}).scan = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);

@@ -29,7 +29,17 @@
     return loose.length === 1 ? loose[0] : -1;
   }
 
-  const api = { normalize, pickOption };
+  // Chrome throws this after the extension is reloaded or updated while a page
+  // that already had the content script stays open.
+  function describeError(error) {
+    const text = String(error && error.message || error || '');
+    if (/context invalidated/i.test(text)) {
+      return 'Job Autofiller was reloaded or updated. Refresh this page and try again.';
+    }
+    return text;
+  }
+
+  const api = { normalize, pickOption, describeError };
   if (typeof module === 'object' && module.exports) module.exports = api;
   else (root.JobAutofiller = root.JobAutofiller || {}).text = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);

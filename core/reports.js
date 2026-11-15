@@ -9,6 +9,7 @@
     manual_checkbox: 'Checkboxes are left for you to confirm',
     consent: 'Consent and agreement fields are left for you',
     sensitive: 'Sensitive field, left for you',
+    approval_required: 'Needs your approval each time, left for you',
     rejected_by_page: 'The page cleared the value',
     already_filled: 'Field already had a value',
     error: 'Unexpected error while filling'
@@ -23,7 +24,7 @@
   }
 
   function summarize(results) {
-    const counts = { filled: 0, verify: 0, existing: 0, review: 0 };
+    const counts = { filled: 0, verify: 0, existing: 0, review: 0, optional: 0 };
     for (const result of results) counts[result.status] = (counts[result.status] || 0) + 1;
     return counts;
   }

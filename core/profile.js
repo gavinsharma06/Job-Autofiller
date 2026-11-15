@@ -142,10 +142,11 @@
     let node = profile;
     for (let i = 0; i < parts.length; i++) {
       const part = parts[i];
-      if (typeof node === 'string' && (part === 'month' || part === 'year')) {
-        const match = /^(\d{4})-(\d{2})$/.exec(node);
+      if (typeof node === 'string' && (part === 'month' || part === 'year' || part === 'day')) {
+        const match = /^(\d{4})-(\d{2})(?:-(\d{2}))?$/.exec(node);
         if (!match) return '';
-        return part === 'year' ? match[1] : match[2];
+        if (part === 'year') return match[1];
+        return part === 'month' ? match[2] : match[3] || '';
       }
       if (node == null || typeof node !== 'object') return '';
       node = node[part];

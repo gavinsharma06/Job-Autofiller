@@ -8,6 +8,10 @@ A Chrome extension that fills the repetitive parts of job applications (Workday 
 2. Choose Load unpacked and select this folder.
 3. Open the extension settings and use Quick setup (below). You can also edit the form by hand or import a JSON file shaped like `profile.example.json`.
 
+## Private data
+
+Settings has a Private data section. Import your work history chunks, certifications and standing answers there as JSON files. They are kept in this browser only and are never part of the repository. Files are recognised by shape: a `projects` list with `role_picks`, a `certifications` list, or a `library` and `websites` file. Library rules look like `{ "match": ["how did you hear"], "answer": ["LinkedIn", "Job Board"] }`, with optional `hosts` to scope a rule to one employer and `"ask": true` to leave a question for you every time.
+
 ## Quick setup
 
 Settings opens with a Quick setup box so you can finish onboarding in one paste and one review.

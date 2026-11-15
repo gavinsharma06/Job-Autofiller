@@ -1,6 +1,11 @@
 (function (root) {
   const { pickOption } = typeof require === 'function' ? require('../core/text') : root.JobAutofiller.text;
   const scan = typeof require === 'function' ? require('./scan') : root.JobAutofiller.scan;
+  const multiselect = typeof require === 'function' ? require('./multiselect') : root.JobAutofiller.multiselect;
+
+  // A page-specific matcher (for example degree wording) can replace the
+  // default option matching through context.pick.
+  const picker = context => (context && context.pick) || pickOption;
 
   function fire(el, type) {
     el.dispatchEvent(new el.ownerDocument.defaultView.Event(type, { bubbles: true }));
@@ -22,9 +27,9 @@
     return el.value === '' ? { ok: false, reason: 'rejected_by_page' } : { ok: true };
   }
 
-  function fillSelect(field, value) {
+  function fillSelect(field, value, context) {
     const options = field.options;
-    let index = pickOption(options.map(option => option.text), value);
+    let index = picker(context)(options.map(option => option.text), value);
     if (index === -1) index = pickOption(options.map(option => option.value), value);
     if (index === -1) return { ok: false, reason: 'option_not_found' };
     field.el.value = options[index].value;
@@ -33,8 +38,8 @@
     return { ok: true };
   }
 
-  function fillRadio(field, value) {
-    const index = pickOption(field.radios.map(radio => radio.text), value);
+  function fillRadio(field, value, context) {
+    const index = picker(context)(field.radios.map(radio => radio.text), value);
     if (index === -1) return { ok: false, reason: 'option_not_found' };
     field.radios[index].el.click();
     return { ok: true };
@@ -83,7 +88,7 @@
     return candidates[0] || null;
   }
 
-  async function fillListbox(field, value, timing) {
+  async function fillListbox(field, value, timing, context) {
     const { timeout, interval } = timing;
     const button = field.el;
     const doc = button.ownerDocument;
@@ -93,7 +98,7 @@
       closeList(button);
       return { ok: false, reason: 'unsupported_control' };
     }
-    const index = pickOption(options.map(option => option.textContent), value);
+    const index = picker(context)(options.map(option => option.textContent), value);
     if (index === -1) {
       closeList(button);
       return { ok: false, reason: 'option_not_found' };
@@ -103,16 +108,30 @@
     return changed ? { ok: true } : { ok: false, reason: 'rejected_by_page' };
   }
 
-  async function fillField(field, value, timing) {
+  async function fillOne(field, value, timing, context) {
     switch (field.kind) {
       case 'text':
       case 'textarea': return fillText(field.el, String(value));
-      case 'select': return fillSelect(field, String(value));
-      case 'radio': return fillRadio(field, String(value));
+      case 'select': return fillSelect(field, String(value), context);
+      case 'radio': return fillRadio(field, String(value), context);
       case 'checkbox': return fillCheckbox(field, value === true);
-      case 'listbox': return fillListbox(field, String(value), timing);
+      case 'listbox': return fillListbox(field, String(value), timing, context);
+      case 'multiselect':
+      case 'combobox': return multiselect.fillMultiselect(field, String(value), timing, context);
       default: return { ok: false, reason: 'unsupported_control' };
     }
+  }
+
+  // A value can be a list of alternatives, tried in order while the page has
+  // no option for the earlier ones (for example "LinkedIn", then "Job Board").
+  async function fillField(field, value, timing, context) {
+    const choices = Array.isArray(value) ? value : [value];
+    let outcome = { ok: false, reason: 'option_not_found' };
+    for (const choice of choices) {
+      outcome = await fillOne(field, choice, timing, context);
+      if (outcome.ok || (outcome.reason !== 'option_not_found' && outcome.reason !== 'unsupported_control')) return outcome;
+    }
+    return outcome;
   }
 
   const api = { fillField, setNativeValue };

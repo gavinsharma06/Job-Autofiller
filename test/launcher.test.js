@@ -109,3 +109,29 @@ test('filling never clicks a submit button or submits the form', async () => {
   assert.equal(submitted, 0);
   assert.equal(clicked, 0);
 });
+
+test('after the extension reloads the launcher says to refresh the page', async () => {
+  const { dom, shadow, host } = openPage('<label for="e">Email</label><input id="e" type="email">', { profile: sampleProfile() });
+  await settle();
+  dom.window.chrome.storage.local.get = async () => { throw new Error('Extension context invalidated.'); };
+  dom.window.JobAutofiller.trust = () => true;
+  shadow.querySelector('button').click();
+  await settle();
+  assert.match(shadow.textContent, /Refresh this page/);
+  assert.equal(host.getAttribute('data-report').includes('Refresh this page'), true);
+});
+
+test('optional fields are counted apart from fields that need you', async () => {
+  const { dom, shadow, host } = openPage(
+    '<label for="e">Email*</label><input id="e" type="email"><label for="q">Middle Name</label><input id="q"><label for="w">Why us?*</label><input id="w">',
+    { profile: sampleProfile() }
+  );
+  await settle();
+  dom.window.JobAutofiller.trust = () => true;
+  shadow.querySelector('button').click();
+  await settle();
+  const { counts } = report(host);
+  assert.equal(counts.review, 1);
+  assert.equal(counts.optional, 1);
+  assert.match(shadow.textContent, /Optional, left blank 1/);
+});

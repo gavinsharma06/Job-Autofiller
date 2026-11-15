@@ -20,7 +20,9 @@
     const profile = await store.getProfile();
     if (!api.profile.hasProfileData(profile)) return { error: 'no_profile' };
     const answers = await store.getAnswers();
-    lastRun = await api.engine.fillPage(document, profile, answers);
+    const privateData = await store.getPrivate();
+    const role = await store.getRole();
+    lastRun = await api.engine.fillPage(document, profile, answers, { privateData, role });
     const report = api.reports.buildReport({
       host: location.hostname,
       ats: lastRun.ats,
@@ -59,7 +61,7 @@
   api.run = { fill };
 
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-    handle(message).then(sendResponse, error => sendResponse({ error: String(error && error.message || error) }));
+    handle(message).then(sendResponse, error => sendResponse({ error: api.text.describeError(error) }));
     return true;
   });
 })(globalThis);

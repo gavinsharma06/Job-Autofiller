@@ -3,7 +3,14 @@
 
   const HOSTS = /(^|\.)(myworkdayjobs|myworkdaysite|wd\d+\.myworkday)\.com$|(^|\.)workday\.com$/i;
 
-  const SECTION_PREFIXES = { workExperience: 'employment', education: 'education' };
+  const SECTION_PREFIXES = {
+    workExperience: 'employment',
+    education: 'education',
+    certifications: 'certifications',
+    websiteSection: 'websites',
+    websites: 'websites'
+  };
+  const SECTION_ID = /^(workExperience|education|certifications|websiteSection|websites)-\d+$/;
 
   const DIRECT_IDS = {
     legalNameSection_firstName: 'personal.firstName',
@@ -30,6 +37,20 @@
       description: 'description',
       currentlyworkhere: 'current'
     },
+    certifications: {
+      certification: 'name',
+      'certification name': 'name',
+      certifications: 'name',
+      'certification number': 'number',
+      'certificate number': 'number',
+      issuer: 'issuer'
+    },
+    websites: {
+      url: 'url',
+      website: 'url',
+      'website url': 'url',
+      'url address': 'url'
+    },
     education: {
       school: 'school',
       'school or university': 'school',
@@ -49,9 +70,8 @@
     const doc = el.ownerDocument;
     for (let node = el.parentElement; node; node = node.parentElement) {
       const id = node.getAttribute('data-automation-id') || '';
-      const match = /^(workExperience|education)-\d+$/.exec(id);
-      if (!match) continue;
-      const prefix = match[1];
+      if (!SECTION_ID.test(id)) continue;
+      const prefix = id.replace(/-\d+$/, '');
       const siblings = Array.from(doc.querySelectorAll(`[data-automation-id^="${prefix}-"]`))
         .filter(item => new RegExp(`^${prefix}-\\d+$`).test(item.getAttribute('data-automation-id')));
       return { type: SECTION_PREFIXES[prefix], index: siblings.indexOf(node), node };
@@ -64,7 +84,23 @@
       const id = (node.getAttribute('data-automation-id') || '').toLowerCase();
       if (id.includes('startdate') || id.includes('firstyear')) return 'startDate';
       if (id.includes('enddate') || id.includes('lastyear')) return 'endDate';
+      if (id.includes('issue')) return 'issued';
+      if (id.includes('expir')) return 'expires';
     }
+    return null;
+  }
+
+  // The parent label ("From", "To", "Issued Date", "Expiration Date") says
+  // which date the Month, Day and Year boxes belong to.
+  function boundaryFromLabel(label, type) {
+    const text = normalize(label);
+    if (type === 'certifications') {
+      if (/^(date )?issued?\b|\bissued? date\b|\bissue date\b/.test(text)) return 'issued';
+      if (/\bexpir|^valid until/.test(text)) return 'expires';
+      return null;
+    }
+    if (/^(from|start)\b/.test(text)) return 'startDate';
+    if (/^(to|end)\b/.test(text)) return 'endDate';
     return null;
   }
 
@@ -73,20 +109,20 @@
     const section = sectionOf(field.el);
 
     if (section) {
-      const part = /dateSection(Month|Year)-input/.exec(id);
-      if (part) {
-        const boundary = dateBoundary(field.el, section);
+      if (field.datePart) {
+        const boundary = dateBoundary(field.el, section) || boundaryFromLabel(field.dateLabel, section.type);
         if (!boundary) return null;
-        return `${section.type}.${section.index}.${boundary}.${part[1].toLowerCase()}`;
+        return `${section.type}.${section.index}.${boundary}.${field.datePart}`;
       }
       const names = SECTION_FIELDS[section.type];
-      const name = names[id.toLowerCase()] || names[normalize(field.label)];
+      let name = names[id.toLowerCase()] || names[normalize(field.label)];
+      if (!name && section.type === 'websites' && field.kind === 'text') name = 'url';
       return name ? `${section.type}.${section.index}.${name}` : null;
     }
     return DIRECT_IDS[id] || null;
   }
 
-  const api = { matchesHost, keyFor, sectionOf };
+  const api = { matchesHost, keyFor, sectionOf, boundaryFromLabel };
   if (typeof module === 'object' && module.exports) module.exports = api;
   else (root.JobAutofiller = root.JobAutofiller || {}).workday = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);

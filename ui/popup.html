@@ -9,6 +9,15 @@
 <body>
   <h1>Job Autofiller</h1>
   <p id="profile-status" class="muted"></p>
+  <label class="muted" for="role">Role type for work experience</label>
+  <select id="role">
+    <option value="">Detect from the page</option>
+    <option value="backend">Backend</option>
+    <option value="fullstack">Full stack</option>
+    <option value="devops">DevOps</option>
+    <option value="ai_ml">AI and ML</option>
+    <option value="support">Support</option>
+  </select>
   <button id="fill" class="primary">Fill this page</button>
   <button id="enable-site">Add page button on this site</button>
   <p id="message" class="muted" role="status"></p>
@@ -25,6 +34,7 @@
   <script src="../core/matcher.js"></script>
   <script src="../core/answers.js"></script>
   <script src="../core/reports.js"></script>
+  <script src="../core/privatedata.js"></script>
   <script src="../core/site.js"></script>
   <script src="../storage/store.js"></script>
   <script src="popup.js"></script>

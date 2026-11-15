@@ -1,6 +1,7 @@
 (function (root) {
   const profileApi = typeof require === 'function' ? require('../core/profile') : root.JobAutofiller.profile;
   const answersApi = typeof require === 'function' ? require('../core/answers') : root.JobAutofiller.answers;
+  const privateApi = typeof require === 'function' ? require('../core/privatedata') : root.JobAutofiller.privatedata;
 
   const MAX_REPORTS = 20;
 
@@ -26,6 +27,22 @@
       },
       async saveAnswers(answers) {
         await area(chromeApi).set({ answers: answersApi.sanitizeAnswers(answers) });
+      },
+      async getPrivate() {
+        return privateApi.sanitizePrivate(await read('privateData', null));
+      },
+      async savePrivate(data) {
+        await area(chromeApi).set({ privateData: privateApi.sanitizePrivate(data) });
+      },
+      async clearPrivate() {
+        await area(chromeApi).set({ privateData: privateApi.emptyPrivate() });
+      },
+      async getRole() {
+        const role = await read('roleType', '');
+        return privateApi.ROLES.includes(role) ? role : '';
+      },
+      async saveRole(role) {
+        await area(chromeApi).set({ roleType: privateApi.ROLES.includes(role) ? role : '' });
       },
       async getReports() {
         return read('reports', []);
