@@ -2,30 +2,63 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Job Autofiller settings</title>
   <link rel="stylesheet" href="ui.css">
   <style>
-    body { max-width: 720px; margin: 0 auto; padding: 20px; }
-    fieldset { margin: 12px 0; }
-    label.field { display: block; margin: 6px 0; }
-    label.field span { display: block; font-size: 12px; opacity: 0.8; }
+    body { max-width: 860px; margin: 0 auto; padding: 20px 16px 48px; }
+    nav.tabs { display: flex; gap: 4px; flex-wrap: wrap; margin: 12px 0 16px; position: sticky; top: 0; background: var(--bg); padding: 6px 0; z-index: 2; }
+    nav.tabs a { padding: 6px 12px; border-radius: 999px; border: 1px solid var(--border); text-decoration: none; color: var(--text); background: var(--surface); }
+    nav.tabs a:hover { border-color: var(--accent); }
+    section.panel { margin: 0 0 22px; scroll-margin-top: 56px; }
+    section.panel > h2 { font-size: 16px; text-transform: none; letter-spacing: 0; color: var(--text); margin: 0 0 4px; }
+    #profile-banner { display: flex; gap: 10px; align-items: flex-start; border: 1px solid var(--border); border-left-width: 5px; border-radius: 10px; background: var(--surface); padding: 10px 12px; margin: 10px 0; }
+    #profile-banner.ready { border-left-color: var(--ok); }
+    #profile-banner.incomplete { border-left-color: var(--warn); }
+    #profile-banner.missing { border-left-color: var(--bad); }
+    #profile-banner button { padding: 1px 6px; font-size: 12px; }
+    #unsaved { display: inline-block; margin-left: 8px; padding: 1px 8px; border-radius: 999px; background: var(--warn-soft); color: var(--warn); font-size: 12px; }
+    fieldset { border: 1px solid var(--border); border-radius: 10px; margin: 12px 0; padding: 8px 12px 12px; background: var(--surface); }
+    legend { font-weight: 600; padding: 0 6px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 8px 12px; }
+    label.field { display: block; }
+    label.field span { display: block; font-size: 12px; color: var(--muted); margin-bottom: 2px; }
     label.field input[type="text"], label.field input[type="email"], label.field input[type="tel"],
-    label.field input[type="url"], label.field input[type="month"], label.field textarea { width: 100%; box-sizing: border-box; padding: 5px; }
-    .card { border: 1px solid #8884; border-radius: 6px; padding: 8px 10px; margin: 8px 0; }
+    label.field input[type="url"], label.field input[type="month"], label.field textarea { width: 100%; }
+    label.field.is-missing input { border-color: var(--warn); box-shadow: 0 0 0 1px var(--warn); }
+    label.field .req { color: var(--warn); }
+    .card { margin: 8px 0; }
+    .card .grid { margin-bottom: 8px; }
     table { width: 100%; border-collapse: collapse; }
-    td { border-top: 1px solid #8884; padding: 5px; vertical-align: top; }
-    #qs-input { width: 100%; box-sizing: border-box; min-height: 180px; font-family: ui-monospace, monospace; font-size: 12px; padding: 6px; }
-    #quick-setup { border: 1px solid #8886; border-radius: 8px; padding: 4px 14px 12px; margin: 12px 0 20px; }
-    #qs-prompt { white-space: pre-wrap; font-size: 11px; max-height: 240px; overflow: auto; border: 1px solid #8884; padding: 6px; }
+    td { border-top: 1px solid var(--border); padding: 6px 4px; vertical-align: top; }
+    #answers td:first-child { width: 32%; font-weight: 600; }
+    #answers textarea { width: 100%; min-height: 54px; }
+    #answers td:last-child { white-space: nowrap; width: 1%; }
+    #answers td:last-child button { display: block; margin-bottom: 4px; width: 100%; }
+    #answers-filter { width: 100%; margin: 6px 0; }
+    #qs-input { width: 100%; min-height: 180px; font-family: ui-monospace, monospace; font-size: 12px; padding: 6px; }
+    #quick-setup { border: 1px solid var(--accent); border-radius: 12px; background: var(--surface); padding: 4px 16px 14px; margin: 0 0 22px; }
+    #qs-prompt { white-space: pre-wrap; font-size: 11px; max-height: 240px; overflow: auto; border: 1px solid var(--border); padding: 6px; }
     #qs-preview-area table { font-size: 12px; }
     #qs-preview-area td.before { opacity: 0.7; }
-    #qs-preview-area .group td { font-weight: 600; border-top: 2px solid #8886; }
+    #qs-preview-area .group td { font-weight: 600; border-top: 2px solid var(--border); }
     .warnings { font-size: 12px; margin: 6px 0; padding-left: 18px; }
+    #storage-report { white-space: pre-wrap; font-size: 12px; border: 1px solid var(--border); border-radius: 8px; padding: 8px; background: var(--surface); }
+    @media (max-width: 520px) { #answers td:first-child { width: auto; } #answers, #answers tbody, #answers tr, #answers td { display: block; width: 100%; } }
   </style>
 </head>
 <body>
   <h1>Job Autofiller settings</h1>
   <p class="muted">Everything here is stored in this browser on this device. Nothing is sent anywhere.</p>
+  <div id="profile-banner" class="missing" role="status"><div id="profile-banner-text">Checking your saved profile...</div></div>
+
+  <nav class="tabs" aria-label="Settings sections">
+    <a href="#quick-setup">Quick setup</a>
+    <a href="#profile">Profile</a>
+    <a href="#answers-panel">Saved answers</a>
+    <a href="#private-data">Private data</a>
+    <a href="#storage">Storage and data</a>
+  </nav>
 
   <section id="quick-setup">
     <h2>Quick setup</h2>
@@ -45,20 +78,32 @@
     <p id="qs-status" class="muted" role="status"></p>
   </section>
 
-  <details id="manual" open>
-    <summary><strong>Edit manually or import a file</strong></summary>
-    <div id="form"></div>
-    <div class="row">
-      <button id="save" class="primary" style="width:auto">Save profile</button>
-      <button id="export">Export profile</button>
-      <button id="import">Import profile</button>
-      <input id="import-file" type="file" accept="application/json" hidden>
-    </div>
-    <p id="status" class="muted" role="status"></p>
-    <p class="muted">Exported files contain personal details. Keep them out of Git and shared folders.</p>
-  </details>
+  <section class="panel" id="profile">
+    <h2>Profile<span id="unsaved" hidden>Unsaved changes</span></h2>
+    <p class="muted">Fields marked * are needed by most application forms. Press Save profile to keep your edits, they are not stored until you do.</p>
+    <details id="manual" open>
+      <summary>Edit manually or import a file</summary>
+      <div id="form"></div>
+      <div class="row">
+        <button id="save" class="primary" style="width:auto">Save profile</button>
+        <button id="export">Export profile</button>
+        <button id="import">Import profile</button>
+        <input id="import-file" type="file" accept="application/json" hidden>
+      </div>
+      <p id="status" class="muted" role="status"></p>
+      <p class="muted">Exported files contain personal details. Keep them out of Git and shared folders.</p>
+    </details>
+  </section>
 
-  <section id="private-data">
+  <section class="panel" id="answers-panel">
+    <h2>Saved answers</h2>
+    <p class="muted">Answers you approved from the popup. They are reused only on an exact match of the question. Edit an answer and press Save, or delete it.</p>
+    <input id="answers-filter" type="search" placeholder="Filter by question" aria-label="Filter saved answers" hidden>
+    <table id="answers"></table>
+    <p id="answers-status" class="muted" role="status"></p>
+  </section>
+
+  <section class="panel" id="private-data">
     <h2>Private data</h2>
     <p class="muted">Import your work history chunks (projects file), certifications and standing answers (answer library file). They are stored in this browser only and are used for Work Experience, Certification and Websites sections and employer questions. Keep the source files out of Git.</p>
     <div class="row">
@@ -69,12 +114,15 @@
     <p id="pd-status" class="muted" role="status"></p>
   </section>
 
-  <h2>Saved answers</h2>
-  <p class="muted">Answers you approved from the popup. They are only reused on an exact match of the question.</p>
-  <table id="answers"></table>
-
-  <h2>Data</h2>
-  <button id="clear">Delete all stored data</button>
+  <section class="panel" id="storage">
+    <h2>Storage and data</h2>
+    <p class="muted">Check what this browser has really stored for the extension, read back from storage rather than from this page.</p>
+    <div class="row">
+      <button id="verify-storage">Check stored data</button>
+      <button id="clear" class="danger">Delete all stored data</button>
+    </div>
+    <pre id="storage-report" hidden></pre>
+  </section>
 
   <script src="../core/text.js"></script>
   <script src="../core/profile.js"></script>

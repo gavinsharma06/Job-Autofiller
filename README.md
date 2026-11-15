@@ -38,6 +38,20 @@ Resume text extraction can later feed `validateCandidate` in `core/quicksetup.js
 4. Fill the orange fields yourself, then press Review my answers to approve reusable answers for next time.
 5. Review everything and submit the application yourself.
 
+## Field states
+
+* Filled: the value was entered and read back from the page, and the page shows it.
+* Already filled: the page had a real value that agrees with your saved profile. It is never changed.
+* Conflict: the page had a real value that differs from your saved profile (for example another city). It is left as it is and listed for review. The popup shows both values and offers Use saved value for that one field.
+* Not accepted: the page cleared or changed the value, or a dropdown shows a different option than the one chosen.
+* Needs you: genuinely unanswered, for example no profile value or no matching option.
+
+Placeholders such as "Select One", "-- Select --" and "No answer" are never treated as answers.
+
+## Page button
+
+The optional page button can be dragged by its grip (or moved with the arrow keys), minimized to a small Fill button and is remembered per site, so it can be moved away from cookie banners. It only reacts to real clicks and key presses.
+
 ## How fields are matched
 
 In order of confidence: Workday automation ids, the HTML `autocomplete` attribute, the field label, then the input type. Labels are matched against fixed patterns, not guessed. A field is skipped when it already has a value, when the profile has nothing for it, when a dropdown has no matching option, or when the question is sensitive (demographics, identity numbers, passwords) or a consent statement.
@@ -59,8 +73,7 @@ After each fill the extension keeps a report of every field and what happened to
 
 ## Known limits
 
-* Only the top frame of the tab is filled. Forms embedded in an iframe must be opened on their own.
-* Searchable dropdowns and multi select controls (for example Workday field of study and skills) are listed for you to complete.
+* Forms embedded in an iframe are filled when they come from a known application system (Greenhouse, Lever, Ashby, Workday, SmartRecruiters and a few others) and you allow access to that one site when the popup asks. Other embedded forms must be opened on their own. The page button covers the top frame only.
 * Workday selectors follow the markup seen in common tenants and are covered by fixtures, not by a live tenant. Copy the fill report if a field is missed.
 
 ## Development

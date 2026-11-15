@@ -5,7 +5,7 @@
 
   const CONTENT_FILES = [
     'core/text.js', 'core/profile.js', 'core/matcher.js', 'core/answers.js', 'core/reports.js',
-    'core/format.js', 'core/degree.js', 'core/privatedata.js',
+    'core/format.js', 'core/degree.js', 'core/values.js', 'core/privatedata.js',
     'storage/store.js', 'adapters/workday.js',
     'content/scan.js', 'content/multiselect.js', 'content/fill.js', 'content/repeaters.js', 'content/engine.js', 'content/index.js'
   ];
@@ -23,85 +23,252 @@
     return tab && tab.id;
   }
 
-  async function request(message) {
+  async function request(message, frameId) {
     const tabId = await activeTabId();
-    return chrome.tabs.sendMessage(tabId, message);
+    return frameId ? chrome.tabs.sendMessage(tabId, message, { frameId }) : chrome.tabs.sendMessage(tabId, message);
   }
 
-  function fieldButton(field) {
-    const item = document.createElement('li');
-    const button = document.createElement('button');
-    button.textContent = field.label || '(unlabelled field)';
-    const reason = document.createElement('span');
-    reason.className = 'tag';
-    reason.textContent = field.status === 'verify' ? 'Filled, please check' : api.reports.describeReason(field.reason);
-    button.appendChild(reason);
-    button.addEventListener('click', () => request({ type: 'focus', index: field.index }));
-    item.appendChild(button);
+  const STAT_TILES = [
+    ['Filled', counts => (counts.filled || 0) + (counts.verify || 0), 'good'],
+    ['Present', counts => counts.existing || 0, 'good'],
+    ['Needs you', counts => counts.review || 0, 'warn'],
+    ['Conflicts', counts => counts.conflict || 0, 'bad'],
+    ['Failed', counts => counts.invalid || 0, 'bad']
+  ];
+
+  function element(tag, className, text) {
+    const node = document.createElement(tag);
+    if (className) node.className = className;
+    if (text != null) node.textContent = text;
+    return node;
+  }
+
+  function tally(fields) {
+    const counts = {};
+    fields.forEach(field => { counts[field.status] = (counts[field.status] || 0) + 1; });
+    return counts;
+  }
+
+  function renderStats(counts) {
+    const stats = $('stats');
+    stats.replaceChildren();
+    stats.hidden = false;
+    for (const [name, pick, tone] of STAT_TILES) {
+      const value = pick(counts);
+      const tile = element('div', `stat ${value ? tone : 'zero'}`);
+      tile.append(element('b', '', String(value)), element('span', '', name));
+      stats.appendChild(tile);
+    }
+  }
+
+  function summaryLine(counts) {
+    const get = name => counts[name] || 0;
+    const parts = [`Filled ${get('filled') + get('verify')}`, `needs you ${get('review')}`, `already filled ${get('existing')}`];
+    if (get('conflict')) parts.push(`conflicts ${get('conflict')}`);
+    if (get('invalid')) parts.push(`not accepted ${get('invalid')}`);
+    let text = `${parts.join(', ')}.`;
+    if (get('optional')) text += ` Optional, left blank ${get('optional')}.`;
+    return text;
+  }
+
+  function reasonText(field) {
+    if (field.status === 'verify') return 'Filled with a lower confidence match, please check';
+    if (field.status === 'invalid') return field.reason === 'value_mismatch'
+      ? 'The page shows a different value than the one entered' : 'The page did not accept the value';
+    return api.reports.describeReason(field.reason);
+  }
+
+  function focusButton(field) {
+    const button = element('button', 'name', field.label || '(unlabelled field)');
+    button.type = 'button';
+    button.title = 'Jump to this field';
+    button.addEventListener('click', () => request({ type: 'focus', index: field.index }, field.frameId));
+    return button;
+  }
+
+  function reviewItem(field, onApply) {
+    const item = element('li');
+    const box = element('div', `item ${field.status}`);
+    box.appendChild(focusButton(field));
+    box.appendChild(element('span', 'tag', reasonText(field)));
+    if (field.status === 'conflict') {
+      const compare = element('div', 'compare');
+      compare.append(element('span', '', `On the page: ${field.existing}`), element('span', '', `Saved profile: ${field.expected}`));
+      const actions = element('div', 'actions');
+      const use = element('button', '', 'Use saved value');
+      use.type = 'button';
+      use.addEventListener('click', () => onApply(field, use));
+      const keep = element('button', 'quiet', 'Go to field');
+      keep.type = 'button';
+      keep.addEventListener('click', () => request({ type: 'focus', index: field.index }, field.frameId));
+      actions.append(use, keep);
+      box.append(compare, actions);
+    }
+    item.appendChild(box);
     return item;
+  }
+
+  function plainList(title, fields) {
+    const details = document.createElement('details');
+    details.appendChild(element('summary', '', `${title} (${fields.length})`));
+    const list = element('ul', 'list');
+    fields.forEach(field => list.appendChild(element('li', '', field.label || '(unlabelled field)')));
+    details.appendChild(list);
+    return details;
+  }
+
+  let lastFields = [];
+
+  async function applySaved(field, button) {
+    button.disabled = true;
+    let outcome;
+    try {
+      outcome = await request({ type: 'apply', index: field.index }, field.frameId);
+    } catch (error) {
+      say(api.text.describeError(error), true);
+      button.disabled = false;
+      return;
+    }
+    const target = lastFields.find(item => item.index === field.index && item.frameId === field.frameId);
+    if (target && outcome && outcome.status) target.status = outcome.status;
+    if (target && outcome && !outcome.ok) target.reason = outcome.reason || 'value_mismatch';
+    renderResults({ counts: tally(lastFields), fields: lastFields });
+    say(outcome && outcome.ok ? `Updated ${field.label || 'the field'} to the saved value.`
+      : 'Could not change that field. Edit it on the page.', !(outcome && outcome.ok));
   }
 
   function renderResults(response) {
     const results = $('results');
     results.replaceChildren();
-    const { counts, fields } = response;
-    let summary = `Filled ${counts.filled + counts.verify}, needs you ${counts.review}, already filled ${counts.existing}.`;
-    if (counts.optional) summary += ` Optional, left blank ${counts.optional}.`;
-    say(summary);
-    const groups = [['Needs your attention', 'review'], ['Filled, please check', 'verify']];
-    const done = fields.filter(field => field.status === 'filled');
-    if (done.length) {
-      const details = document.createElement('details');
-      const summary = document.createElement('summary');
-      summary.textContent = `Filled (${done.length})`;
-      const list = document.createElement('ul');
-      list.className = 'list';
-      done.forEach(field => {
-        const item = document.createElement('li');
-        item.textContent = field.label || '(unlabelled field)';
-        list.appendChild(item);
-      });
-      details.append(summary, list);
-      results.appendChild(details);
-    }
+    const { fields } = response;
+    lastFields = fields;
+    const counts = Object.assign({}, response.counts, tally(fields));
+    renderStats(counts);
+    say(summaryLine(counts));
+    const groups = [
+      ['Conflicts, review before submitting', 'conflict'],
+      ['Not accepted by the page', 'invalid'],
+      ['Needs your answer', 'review'],
+      ['Filled, please check', 'verify']
+    ];
     for (const [title, status] of groups) {
       const items = fields.filter(field => field.status === status);
       if (!items.length) continue;
-      const heading = document.createElement('h2');
-      heading.textContent = `${title} (${items.length})`;
-      const list = document.createElement('ul');
-      list.className = 'list';
-      items.forEach(field => list.appendChild(fieldButton(field)));
-      results.append(heading, list);
+      results.appendChild(element('h2', '', `${title} (${items.length})`));
+      const list = element('ul', 'list');
+      items.forEach(field => list.appendChild(reviewItem(field, applySaved)));
+      results.appendChild(list);
     }
+    const done = fields.filter(field => field.status === 'filled');
+    if (done.length) results.appendChild(plainList('Filled', done));
+    const present = fields.filter(field => field.status === 'existing');
+    if (present.length) results.appendChild(plainList('Already filled', present));
+    if (!fields.length) {
+      results.appendChild(element('p', 'muted', 'No form fields were found that this extension could reach. The form may be embedded from another site.'));
+    } else if (!fields.some(field => ['conflict', 'invalid', 'review', 'verify'].includes(field.status))) {
+      results.appendChild(element('p', 'muted', 'Nothing needs review on this page. Check everything before you submit.'));
+    }
+  }
+
+  // The latest saved report gives the tiles something to show before the
+  // first fill in this popup, so statistics survive closing it.
+  async function showLastRun() {
+    const [latest] = await store.getReports();
+    if (!latest || !latest.counts) return;
+    renderStats(latest.counts);
+    const source = $('source');
+    source.hidden = false;
+    source.textContent = `Last fill: ${latest.host || 'a page'}${latest.generatedOn ? `, ${latest.generatedOn}` : ''}`;
+  }
+
+  let frameIds = [0];
+
+  function mergeResponses(responses) {
+    const fields = [];
+    responses.forEach(({ frameId, response }) => {
+      (response.fields || []).forEach(field => fields.push(Object.assign({}, field, { frameId })));
+    });
+    return { fields, counts: {} };
+  }
+
+  // Embedded application forms need access to the frame's own site. Chrome
+  // asks once for that site, and only for well known application systems.
+  async function missingFrameAccess(tabId) {
+    try {
+      const [probe] = await chrome.scripting.executeScript({ target: { tabId }, func: api.site.listFrames });
+      const tab = await chrome.tabs.get(tabId);
+      const forms = api.site.embeddedForms(probe && probe.result, tab && tab.url);
+      const missing = [];
+      for (const form of forms) {
+        if (!(await chrome.permissions.contains({ origins: [form.pattern] }))) missing.push(form);
+      }
+      return missing;
+    } catch (error) {
+      return [];
+    }
+  }
+
+  function renderAccessNotice(missing) {
+    const box = element('div', 'card');
+    const hosts = missing.map(form => form.host).join(', ');
+    box.appendChild(element('p', '', `This page embeds an application form from ${hosts}. Allow access to fill it.`));
+    const allow = element('button', '', `Allow ${hosts}`);
+    allow.type = 'button';
+    allow.addEventListener('click', () => {
+      // The permission request is the first thing the click does, so Chrome still counts it as a user gesture.
+      chrome.permissions.request({ origins: missing.map(form => form.pattern) }).then(granted => {
+        if (granted) fill();
+        else say('Access was not granted, so the embedded form was not filled.', true);
+      }, error => say(`Chrome refused the access request: ${String(error && error.message || error)}`, true));
+    });
+    box.appendChild(allow);
+    $('results').prepend(box);
   }
 
   async function fill() {
     say('Filling...');
     $('results').replaceChildren();
+    $('source').hidden = true;
     const tabId = await activeTabId();
+    let injected;
     try {
-      await chrome.scripting.executeScript({ target: { tabId }, files: CONTENT_FILES });
+      injected = await chrome.scripting.executeScript({ target: { tabId, allFrames: true }, files: CONTENT_FILES });
     } catch (error) {
-      say('This page cannot be filled. Browser pages and the Web Store are blocked.', true);
+      say('This page cannot be filled. Browser pages and the Web Store are blocked. If the page just opened, scroll or reload it and try again.', true);
       return;
     }
-    let response;
-    try {
-      response = await request({ type: 'fill' });
-    } catch (error) {
-      say(api.text.describeError(error), true);
+    frameIds = Array.isArray(injected) && injected.length ? Array.from(new Set(injected.map(item => item.frameId || 0))) : [0];
+    const responses = [];
+    let failure = null;
+    for (const frameId of frameIds) {
+      try {
+        responses.push({ frameId, response: await request({ type: 'fill' }, frameId) });
+      } catch (error) {
+        failure = failure || error;
+      }
+    }
+    if (!responses.length) {
+      say(api.text.describeError(failure), true);
       return;
     }
-    if (response.error === 'no_profile') {
+    if (responses.some(item => item.response && item.response.error === 'no_profile')) {
       say('Add your details in Settings first.', true);
       return;
     }
-    if (response.error) {
-      say(`Could not fill this page: ${response.error}`, true);
+    const errored = responses.find(item => item.response && item.response.error);
+    const usable = responses.filter(item => item.response && !item.response.error);
+    if (!usable.length) {
+      say(`Could not fill this page: ${errored.response.error}`, true);
       return;
     }
-    renderResults(response);
+    const withFields = usable.filter(item => (item.response.fields || []).length);
+    const merged = withFields.length === 1 && withFields[0].frameId === 0 && usable.length === 1
+      ? Object.assign({}, withFields[0].response, { fields: withFields[0].response.fields.map(field => Object.assign({}, field, { frameId: 0 })) })
+      : mergeResponses(withFields.length ? withFields : usable.slice(0, 1));
+    if (merged.counts && Object.keys(merged.counts).length === 0) merged.counts = tally(merged.fields);
+    renderResults(merged);
+    const missing = await missingFrameAccess(tabId);
+    if (missing.length) renderAccessNotice(missing);
   }
 
   async function learn() {
@@ -109,7 +276,11 @@
     area.replaceChildren();
     let response;
     try {
-      response = await request({ type: 'learn' });
+      response = { items: [] };
+      for (const frameId of frameIds) {
+        const part = await request({ type: 'learn' }, frameId);
+        response.items = response.items.concat(part && part.items ? part.items : []);
+      }
     } catch (error) {
       say('Run Fill this page first.', true);
       return;
@@ -192,17 +363,21 @@
   async function showProfileStatus() {
     const profile = await store.getProfile();
     const described = api.profile.describeProfile(profile);
-    const el = $('profile-status');
+    const text = $('profile-status');
+    const chip = $('profile-chip');
     if (described.state === 'missing') {
-      el.textContent = 'No profile yet. Open Settings and run Quick Setup.';
-      el.className = 'error';
+      text.textContent = 'No profile yet. Open Settings and run Quick Setup.';
+      chip.className = 'chip missing';
       return;
     }
-    el.textContent = `Profile: ${api.profile.getValue(profile, 'fullName') || profile.personal.email}`;
+    const name = api.profile.getValue(profile, 'fullName') || profile.personal.email;
     if (described.state === 'incomplete') {
-      el.textContent += `. Missing: ${described.missing.join(', ')}.`;
-      el.className = 'error';
+      text.textContent = `${name}. Missing: ${described.missing.join(', ')}.`;
+      chip.className = 'chip incomplete';
+      return;
     }
+    text.textContent = `${name}. Profile ready.`;
+    chip.className = 'chip ready';
   }
 
   async function showRole() {
@@ -216,6 +391,8 @@
   $('copy-report').addEventListener('click', copyReport);
   $('download-report').addEventListener('click', downloadReport);
   $('settings').addEventListener('click', () => chrome.runtime.openOptionsPage());
-  showProfileStatus();
+  $('profile-chip').addEventListener('click', () => chrome.runtime.openOptionsPage());
+  showProfileStatus().catch(error => say(api.text.describeError(error), true));
   showRole();
+  showLastRun().catch(() => {});
 })();

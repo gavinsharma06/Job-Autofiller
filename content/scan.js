@@ -1,4 +1,5 @@
 (function (root) {
+  const values = typeof require === 'function' ? require('../core/values') : root.JobAutofiller.values;
   const SKIP_INPUT_TYPES = new Set(['hidden', 'submit', 'button', 'reset', 'image', 'password', 'search', 'range', 'color']);
   const SELECTOR = 'input, select, textarea, button[aria-haspopup="listbox"]';
 
@@ -72,8 +73,9 @@
       .map(option => ({ text: option.textContent.trim(), value: option.value }));
   }
 
+  // A placeholder such as "Select One" or "No answer" is not a chosen value.
   function isPlaceholderText(text) {
-    return !text || /^(select|choose|please select)\b/i.test(text.trim());
+    return values.isPlaceholder(text);
   }
 
   const MULTISELECT = '[data-automation-id="multiSelectContainer"], [data-uxi-widget-type="multiselect"]';
@@ -143,31 +145,54 @@
     return el.required === true || el.getAttribute('aria-required') === 'true' || /\*|\(required\)/i.test(rawLabel || '');
   }
 
-  function hasValue(field) {
-    const el = field.el;
-    switch (field.kind) {
-      case 'select': return el.value !== '';
-      case 'radio': return field.radios.some(radio => radio.el.checked);
-      case 'checkbox': return el.checked;
-      case 'listbox': return !isPlaceholderText(el.textContent);
-      case 'multiselect': return pillsOf(containerOf(el)).length > 0;
-      default: return String(el.value || '').trim() !== '';
+  const SHOWN_VALUE = '[class*="single-value"], [class*="singleValue"], [class*="SingleValue"]';
+
+  function shownSelection(el) {
+    for (let node = el.parentElement, depth = 0; node && depth < 5; node = node.parentElement, depth++) {
+      const found = node.querySelector(SHOWN_VALUE);
+      if (found) {
+        const text = found.textContent.replace(/\s+/g, ' ').trim();
+        return isPlaceholderText(text) ? '' : text;
+      }
     }
+    return '';
   }
 
+  function selectedText(el) {
+    return el.selectedIndex >= 0 ? el.options[el.selectedIndex].textContent.trim() : '';
+  }
+
+  // Only a real choice counts. An empty box, a placeholder option or a default
+  // such as "No answer" is reported as no value.
   function readValue(field) {
     const el = field.el;
     switch (field.kind) {
-      case 'select': return el.selectedIndex >= 0 ? el.options[el.selectedIndex].textContent.trim() : '';
+      case 'select': {
+        const text = selectedText(el);
+        return el.value === '' || isPlaceholderText(text) ? '' : text;
+      }
       case 'radio': {
         const checked = field.radios.find(radio => radio.el.checked);
-        return checked ? checked.text : '';
+        return checked && !isPlaceholderText(checked.text) ? checked.text : '';
       }
-      case 'listbox': return isPlaceholderText(el.textContent) ? '' : el.textContent.trim();
+      case 'listbox': return isPlaceholderText(el.textContent) ? '' : el.textContent.replace(/\s+/g, ' ').trim();
       case 'checkbox': return el.checked ? 'checked' : '';
-      case 'multiselect': return pillsOf(containerOf(el)).map(pillText).join(', ');
-      default: return String(el.value || '').trim();
+      case 'multiselect': return pillsOf(containerOf(el)).map(pillText).filter(text => !isPlaceholderText(text)).join(', ');
+      case 'combobox': {
+        // Searchable dropdowns keep the search box empty and show the chosen
+        // value in a sibling element, so that is read as well.
+        const typed = String(el.value || '').trim();
+        return isPlaceholderText(typed) ? shownSelection(el) : typed;
+      }
+      default: {
+        const text = String(el.value || '').trim();
+        return isPlaceholderText(text) ? '' : text;
+      }
     }
+  }
+
+  function hasValue(field) {
+    return readValue(field) !== '';
   }
 
   function collectFields(doc) {

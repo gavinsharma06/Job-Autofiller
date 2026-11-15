@@ -12,6 +12,8 @@
     approval_required: 'Needs your approval each time, left for you',
     rejected_by_page: 'The page cleared the value',
     already_filled: 'Field already had a value',
+    conflicts_with_profile: 'Page value differs from your saved profile, left unchanged',
+    value_mismatch: 'The page shows a different value than the one entered',
     error: 'Unexpected error while filling'
   };
 
@@ -52,7 +54,7 @@
     const secrets = secretsFrom(profile);
     const reasons = {};
     for (const result of results) {
-      if (result.status !== 'review') continue;
+      if (result.status !== 'review' && result.status !== 'conflict' && result.status !== 'invalid') continue;
       reasons[result.reason] = (reasons[result.reason] || 0) + 1;
     }
     return {

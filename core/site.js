@@ -61,7 +61,34 @@
     return { ok: true, stage: 'done', hostname: site.hostname, message: `Button added on ${site.hostname}. Press Alt+Shift+F or use the button on the page.${warning}` };
   }
 
-  const api = { sitePattern, enableOnTab };
+  // Application forms are often embedded from the applicant tracking system.
+  // Only well known systems are offered, so a page cannot make the extension
+  // ask for access to an arbitrary site.
+  const ATS_FRAME_HOSTS = /(^|\.)(greenhouse\.io|lever\.co|ashbyhq\.com|myworkdayjobs\.com|myworkdaysite\.com|smartrecruiters\.com|icims\.com|jobvite\.com|workable\.com|bamboohr\.com|taleo\.net|breezy\.hr|recruitee\.com)$/i;
+  const MIN_FORM_WIDTH = 300;
+  const MIN_FORM_HEIGHT = 200;
+
+  // Runs inside the page. It returns sizes and addresses of frames only.
+  function listFrames() {
+    return Array.from(document.querySelectorAll('iframe')).map(frame => ({ src: frame.src, w: frame.offsetWidth, h: frame.offsetHeight }));
+  }
+
+  // The embedded forms on a page that come from a known system on another host.
+  function embeddedForms(frames, topUrl) {
+    let topHost = '';
+    try { topHost = new URL(topUrl).hostname; } catch (error) { topHost = ''; }
+    const found = new Map();
+    for (const frame of frames || []) {
+      let url;
+      try { url = new URL(frame.src); } catch (error) { continue; }
+      if (url.protocol !== 'https:' || url.hostname === topHost || !ATS_FRAME_HOSTS.test(url.hostname)) continue;
+      if (!(frame.w >= MIN_FORM_WIDTH && frame.h >= MIN_FORM_HEIGHT)) continue;
+      found.set(url.hostname, { host: url.hostname, pattern: `https://${url.hostname}/*` });
+    }
+    return Array.from(found.values());
+  }
+
+  const api = { sitePattern, enableOnTab, listFrames, embeddedForms };
   if (typeof module === 'object' && module.exports) module.exports = api;
   else (root.JobAutofiller = root.JobAutofiller || {}).site = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);

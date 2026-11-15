@@ -4,6 +4,15 @@
   const privateApi = typeof require === 'function' ? require('../core/privatedata') : root.JobAutofiller.privatedata;
 
   const MAX_REPORTS = 20;
+  const MAX_PLACEMENTS = 50;
+
+  function cleanPlacement(raw) {
+    if (!raw || typeof raw !== 'object') return null;
+    const x = Number(raw.x);
+    const y = Number(raw.y);
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+    return { x: Math.round(x), y: Math.round(y), minimized: raw.minimized === true };
+  }
 
   function area(chromeApi) {
     return chromeApi.storage.local;
@@ -50,6 +59,21 @@
       async addReport(report) {
         const reports = await read('reports', []);
         await area(chromeApi).set({ reports: [report].concat(reports).slice(0, MAX_REPORTS) });
+      },
+      // Where the page launcher sits, remembered per site so it can be moved
+      // away from that site's cookie banner. Only a position and a flag.
+      async getPlacement(host) {
+        const all = await read('launcherPlacement', {});
+        return cleanPlacement(all && all[host]) || cleanPlacement(all && all['*']);
+      },
+      async savePlacement(host, placement) {
+        const clean = cleanPlacement(placement);
+        if (!clean || !host) return;
+        const all = await read('launcherPlacement', {});
+        const next = Object.assign({}, all, { [host]: clean, '*': clean });
+        const keys = Object.keys(next).filter(key => key !== '*');
+        keys.slice(0, Math.max(0, keys.length - MAX_PLACEMENTS)).forEach(key => { delete next[key]; });
+        await area(chromeApi).set({ launcherPlacement: next });
       },
       async clearAll() {
         await area(chromeApi).clear();

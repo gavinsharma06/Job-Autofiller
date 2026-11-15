@@ -56,13 +56,16 @@ test('never submits, never ticks consent boxes, never answers sensitive fields',
   assert.equal(statusOf(run, 'Gender').reason, 'sensitive');
 });
 
-test('existing values are never overwritten', async () => {
+test('existing values are never overwritten, a differing one is a conflict and a matching one is present', async () => {
   const dom = makeDom(read('generic.html'));
   const doc = dom.window.document;
   doc.getElementById('first_name').value = 'Keep';
+  doc.getElementById('last_name').value = 'sample';
   const run = await engine.fillPage(doc, sampleProfile(), [], TIMING);
   assert.equal(doc.getElementById('first_name').value, 'Keep');
-  assert.equal(statusOf(run, 'First Name *').status, 'existing');
+  assert.equal(statusOf(run, 'First Name *').status, 'conflict');
+  assert.equal(doc.getElementById('last_name').value, 'sample');
+  assert.equal(statusOf(run, 'Last Name *').status, 'existing');
 });
 
 test('events are dispatched so framework listeners see the change', async () => {
@@ -231,7 +234,7 @@ test('fill reports never contain profile values or typed answers', async () => {
 test('reports list skipped fields with reasons and redact contact details found in labels', async () => {
   const dom = makeDom(`${read('generic.html')}<label for="conf">Confirm jane.sample@example.com is correct</label><input id="conf">`);
   const profile = sampleProfile();
-  dom.window.document.getElementById('first_name').value = 'Keep';
+  dom.window.document.getElementById('first_name').value = 'Jane';
   const run = await engine.fillPage(dom.window.document, profile, [], TIMING);
   const report = reports.buildReport({ host: 'careers.example.com', ats: run.ats, results: run.results, profile });
 

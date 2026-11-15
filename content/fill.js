@@ -2,6 +2,7 @@
   const { pickOption } = typeof require === 'function' ? require('../core/text') : root.JobAutofiller.text;
   const scan = typeof require === 'function' ? require('./scan') : root.JobAutofiller.scan;
   const multiselect = typeof require === 'function' ? require('./multiselect') : root.JobAutofiller.multiselect;
+  const values = typeof require === 'function' ? require('../core/values') : root.JobAutofiller.values;
 
   // A page-specific matcher (for example degree wording) can replace the
   // default option matching through context.pick.
@@ -18,16 +19,30 @@
     descriptor.set.call(el, value);
   }
 
-  function fillText(el, value) {
+  function wait(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  // An input event proves nothing: pages can reset or reformat the value on the
+  // next tick. Every fill is therefore read back from the page after one tick,
+  // and it only counts when the page holds what was meant to be entered.
+  async function settle() {
+    await wait(0);
+  }
+
+  async function fillText(el, value, context) {
     el.focus();
     setNativeValue(el, value);
     fire(el, 'input');
     fire(el, 'change');
     el.blur();
-    return el.value === '' ? { ok: false, reason: 'rejected_by_page' } : { ok: true };
+    await settle();
+    if (String(el.value).trim() === '') return { ok: false, reason: 'rejected_by_page' };
+    const key = context && context.key;
+    return values.agrees(key, value, el.value) ? { ok: true } : { ok: false, reason: 'value_mismatch' };
   }
 
-  function fillSelect(field, value, context) {
+  async function fillSelect(field, value, context) {
     const options = field.options;
     let index = picker(context)(options.map(option => option.text), value);
     if (index === -1) index = pickOption(options.map(option => option.value), value);
@@ -35,23 +50,25 @@
     field.el.value = options[index].value;
     fire(field.el, 'input');
     fire(field.el, 'change');
-    return { ok: true };
+    await settle();
+    const chosen = field.el.selectedIndex >= 0 ? field.el.options[field.el.selectedIndex] : null;
+    if (!chosen || chosen.value === '' || values.isPlaceholder(chosen.textContent)) return { ok: false, reason: 'rejected_by_page' };
+    if (chosen.value !== options[index].value) return { ok: false, reason: 'value_mismatch' };
+    return { ok: true, selected: options[index].text };
   }
 
-  function fillRadio(field, value, context) {
+  async function fillRadio(field, value, context) {
     const index = picker(context)(field.radios.map(radio => radio.text), value);
     if (index === -1) return { ok: false, reason: 'option_not_found' };
     field.radios[index].el.click();
-    return { ok: true };
+    await settle();
+    return field.radios[index].el.checked ? { ok: true, selected: field.radios[index].text } : { ok: false, reason: 'rejected_by_page' };
   }
 
-  function fillCheckbox(field, wanted) {
+  async function fillCheckbox(field, wanted) {
     if (field.el.checked !== wanted) field.el.click();
-    return { ok: true };
-  }
-
-  function wait(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
+    await settle();
+    return field.el.checked === wanted ? { ok: true } : { ok: false, reason: 'rejected_by_page' };
   }
 
   async function waitFor(check, timeout, interval) {
@@ -91,7 +108,6 @@
   async function fillListbox(field, value, timing, context) {
     const { timeout, interval } = timing;
     const button = field.el;
-    const doc = button.ownerDocument;
     button.click();
     const options = await waitFor(() => findOptions(button), timeout, interval);
     if (!options) {
@@ -103,15 +119,20 @@
       closeList(button);
       return { ok: false, reason: 'option_not_found' };
     }
+    const chosen = options[index].textContent.replace(/\s+/g, ' ').trim();
     options[index].click();
     const changed = await waitFor(() => !scan.isPlaceholderText(button.textContent), timeout, interval);
-    return changed ? { ok: true } : { ok: false, reason: 'rejected_by_page' };
+    if (!changed) return { ok: false, reason: 'rejected_by_page' };
+    await settle();
+    // The box must now show the option that was clicked, not just any value.
+    const shown = button.textContent.replace(/\s+/g, ' ').trim();
+    return values.agrees('', chosen, shown) ? { ok: true, selected: chosen } : { ok: false, reason: 'value_mismatch' };
   }
 
   async function fillOne(field, value, timing, context) {
     switch (field.kind) {
       case 'text':
-      case 'textarea': return fillText(field.el, String(value));
+      case 'textarea': return fillText(field.el, String(value), context);
       case 'select': return fillSelect(field, String(value), context);
       case 'radio': return fillRadio(field, String(value), context);
       case 'checkbox': return fillCheckbox(field, value === true);

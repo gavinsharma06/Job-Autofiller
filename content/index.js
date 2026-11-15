@@ -12,7 +12,11 @@
       label: result.label,
       status: result.status,
       reason: result.reason || '',
-      via: result.via || ''
+      via: result.via || '',
+      // Page and profile values are sent to the popup only, and only for
+      // conflicts, so the person can compare them. Reports never hold them.
+      existing: result.status === 'conflict' ? result.existing : undefined,
+      expected: result.status === 'conflict' ? result.expected : undefined
     }));
   }
 
@@ -42,6 +46,12 @@
     return { ok: true };
   }
 
+  async function apply(index) {
+    const result = lastRun && lastRun.results.find(item => item.index === index);
+    const outcome = await api.engine.applyConflict(result);
+    return Object.assign({ status: result ? result.status : '' }, outcome);
+  }
+
   function learnable() {
     return { items: lastRun ? api.engine.collectLearnable(lastRun.results) : [] };
   }
@@ -51,6 +61,7 @@
       case 'fill': return fill();
       case 'focus': return focusField(message.index);
       case 'learn': return learnable();
+      case 'apply': return apply(message.index);
       case 'clear':
         api.engine.clearMarks(document);
         return { ok: true };

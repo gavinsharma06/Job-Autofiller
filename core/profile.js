@@ -155,7 +155,7 @@
     return typeof node === 'string' ? node : '';
   }
 
-  const api = { SCHEMA_VERSION, SECTIONS, LISTS, normalizeProfile, emptyProfile, hasProfileData, describeProfile, getValue };
+  const api = { SCHEMA_VERSION, SECTIONS, LISTS, ESSENTIAL, normalizeProfile, emptyProfile, hasProfileData, describeProfile, getValue };
   if (typeof module === 'object' && module.exports) module.exports = api;
   else (root.JobAutofiller = root.JobAutofiller || {}).profile = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);

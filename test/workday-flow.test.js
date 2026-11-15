@@ -208,7 +208,7 @@ test('a searchable select that shows no pill is never reported as filled', async
   wireMultiselect(doc, ['Computer Science'], true);
   const run = await engine.fillPage(doc, profile(), [], TIMING);
   const result = byLabel(run, 'Field of Study');
-  assert.equal(result.status, 'review');
+  assert.equal(result.status, 'invalid');
   assert.equal(result.reason, 'rejected_by_page');
   assert.equal(doc.getElementById('fos').value, '');
 });

@@ -2,33 +2,51 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Job Autofiller</title>
   <link rel="stylesheet" href="ui.css">
-  <style>body { width: 340px; }</style>
+  <style>body { width: 380px; max-width: 100%; min-width: 320px; }</style>
 </head>
 <body>
-  <h1>Job Autofiller</h1>
-  <p id="profile-status" class="muted"></p>
-  <label class="muted" for="role">Role type for work experience</label>
-  <select id="role">
-    <option value="">Detect from the page</option>
-    <option value="backend">Backend</option>
-    <option value="fullstack">Full stack</option>
-    <option value="devops">DevOps</option>
-    <option value="ai_ml">AI and ML</option>
-    <option value="support">Support</option>
-  </select>
-  <button id="fill" class="primary">Fill this page</button>
-  <button id="enable-site">Add page button on this site</button>
-  <p id="message" class="muted" role="status"></p>
-  <div id="results"></div>
-  <div class="row">
-    <button id="learn">Review my answers</button>
-    <button id="copy-report">Copy report</button>
-    <button id="download-report">Download report</button>
-    <button id="settings">Settings</button>
+  <div class="header">
+    <h1>Job Autofiller</h1>
+    <button id="settings" class="quiet" aria-label="Open settings">Settings</button>
   </div>
+
+  <button id="profile-chip" class="chip missing" type="button" aria-label="Profile status. Open settings.">
+    <span class="dot" aria-hidden="true"></span>
+    <span id="profile-status">Checking profile...</span>
+  </button>
+
+  <button id="fill" class="primary">Fill this page</button>
+  <p id="message" class="muted" role="status" aria-live="polite"></p>
+
+  <div id="stats" class="stats" hidden></div>
+  <p id="source" class="muted source" hidden></p>
+  <div id="results"></div>
+
+  <details id="more">
+    <summary>More</summary>
+    <div class="body">
+      <label class="muted" for="role">Role type for work experience</label>
+      <select id="role">
+        <option value="">Detect from the page</option>
+        <option value="backend">Backend</option>
+        <option value="fullstack">Full stack</option>
+        <option value="devops">DevOps</option>
+        <option value="ai_ml">AI and ML</option>
+        <option value="support">Support</option>
+      </select>
+      <div class="row">
+        <button id="enable-site">Add page button on this site</button>
+        <button id="learn">Review my answers</button>
+        <button id="copy-report">Copy report</button>
+        <button id="download-report">Download report</button>
+      </div>
+    </div>
+  </details>
   <div id="learn-area"></div>
+
   <script src="../core/text.js"></script>
   <script src="../core/profile.js"></script>
   <script src="../core/matcher.js"></script>
